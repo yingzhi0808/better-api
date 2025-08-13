@@ -37,7 +37,7 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "node --watch --import @oxc-node/core/register examples/server.ts",
+    "dev": "node --watch --enable-source-maps --import @oxc-node/core/register examples/server.ts",
     "build": "tsdown",
     "test": "vitest run --no-isolate --pool=threads",
     "test:watch": "vitest --no-isolate --pool=threads",

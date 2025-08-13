@@ -1,7 +1,8 @@
+import { writeFile } from 'node:fs/promises'
 import http from 'node:http'
 import { getRequestListener } from '@hono/node-server'
-// import { createNodeWebSocket } from "@hono/node-ws";
 import z from 'zod'
+// import { createNodeWebSocket } from "@hono/node-ws";
 import {
   addGlobalResponse,
   configureOpenAPI,
@@ -9,14 +10,14 @@ import {
   setSecuritySchemes,
 } from '@/core/openapi'
 import { BetterAPI } from '@/hono/api'
-import { mountSwaggerUI } from './plugins/hono-swagger'
+import { mountSwaggerUI } from '@/plugins/hono-swagger'
 
 /* ---------- 使用示例 ---------- */
 const app = new BetterAPI()
 const honoApp = app.getInstance()
 
 // 挂载 OpenAPI 和 Swagger UI（/openapi.json, /docs, /docs 静态资源）
-mountSwaggerUI(honoApp, { docsPath: '/docs', openapiPath: '/openapi.json' })
+mountSwaggerUI(honoApp, { docsPath: '/swagger', openapiPath: '/openapi.json' })
 
 // 配置全局 OpenAPI 信息与安全、默认错误响应
 configureOpenAPI({
@@ -130,16 +131,14 @@ addGlobalResponse('500', z.object({ detail: z.string() }))
 app.post(
   '/articles/:id',
   async (c) => {
-    console.log(c.cookies.sid)
-    // const me = await c.deps.currentUser;
+    const file = c.file
+
+    writeFile(file.name, Buffer.from(await file.arrayBuffer()))
+    console.log(file)
+
     return c.json(
       {
-        id: c.params.id,
-        // me,
-        query: c.query,
-        headers: c.headers,
-        cookies: c.cookies,
-        body: c.body,
+        success: true,
       },
       201,
     )
@@ -155,14 +154,14 @@ app.post(
         example: '456',
       }),
     }),
-    body: z.object({ title: z.string(), content: z.string().min(1) }),
+    body: z.object({
+      image: z.base64().meta({
+        description: '文件',
+      }),
+    }),
     response: z
       .object({
-        id: z.string(),
-        query: z.any(),
-        headers: z.any(),
-        cookies: z.any(),
-        body: z.any(),
+        success: z.boolean(),
       })
       .meta({ responseDescription: '创建文章' }),
   },
