@@ -1,9 +1,9 @@
 import http from 'node:http'
 import type { StatusCode } from 'hono/utils/http-status'
-import {
+import z, {
   toJSONSchema,
   type ZodArray,
-  type ZodFile,
+  ZodFile,
   type ZodObject,
   type ZodType,
 } from 'zod'
@@ -11,7 +11,6 @@ import type { HttpMethod, ParameterIn } from '@/types/common'
 import type {
   ExampleObject,
   InfoObject,
-  MediaTypeObject,
   OperationObject,
   ParameterObject,
   PathsObject,
@@ -149,49 +148,68 @@ function buildParametersFromObject(where: ParameterIn, schema?: ZodObject) {
 }
 
 function buildRequestBody(
-  body?: ZodType,
-  contentTypes = ['application/json'],
-  fileFields: string[] = [],
-): RequestBodyObject | undefined {
-
-  if (!body) {
-    return undefined
+  schemas: Pick<RouteSchema, 'body' | 'form' | 'file' | 'files'>,
+) {
+  const requestBody: RequestBodyObject = {
+    content: {},
   }
-  const schema = toJSONSchema(body) as SchemaObject
-  console.log(schema);
 
-  if (contentTypes?.includes('multipart/form-data')) {
-    const record = schema as unknown as {
-      properties?: Record<string, SchemaObject>
+  const { body, form, file, files } = schemas
+
+  if (body) {
+    requestBody.content['application/json'] = {
+      schema: toJSONSchema(body) as SchemaObject,
     }
-    const props = record.properties
-    if (props && fileFields?.length) {
-      for (const key of fileFields) {
-        const target = props[key]
-        if (target) {
-          target.type = 'string'
-          ;(target as { format?: string }).format = 'binary'
-        }
+  }
+
+  if (form) {
+    const jsonSchema = toJSONSchema(form) as SchemaObject
+    requestBody.content['multipart/form-data'] = {
+      schema: jsonSchema,
+    }
+
+    const hasFile = Object.values(form.shape).some((v) => v instanceof ZodFile)
+    if (!hasFile) {
+      requestBody.content['application/x-www-form-urlencoded'] = {
+        schema: jsonSchema,
       }
     }
   }
-  const content: Record<string, MediaTypeObject> = {}
-  for (const ct of contentTypes ?? ['application/json']) {
-    content[ct] = { schema }
+
+  if (file) {
+    requestBody.content['multipart/form-data'] = {
+      schema: toJSONSchema(z.object({ file })) as SchemaObject,
+    }
   }
-  return { content }
+
+  if (files) {
+    requestBody.content['multipart/form-data'] = {
+      schema: toJSONSchema(z.object({ files })) as SchemaObject,
+    }
+  }
+
+  return Object.keys(requestBody.content).length > 0 ? requestBody : undefined
+}
+
+/**
+ * 将 Hono 路径参数格式转换为 OpenAPI 格式: `/users/:id` -> `/users/{id}`
+ */
+function convertExpressPathToOpenAPI(path: string) {
+  return path.replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, '{$1}')
 }
 
 export function generateOpenAPI() {
   const paths: PathsObject = {}
 
   for (const route of globalRouteSchemas) {
-    if (!paths[route.path]) {
-      paths[route.path] = {}
+    const path = convertExpressPathToOpenAPI(route.path)
+
+    if (!paths[path]) {
+      paths[path] = {}
     }
 
     const method = route.method.toLowerCase() as HttpMethod
-    if (!paths[route.path][method]) {
+    if (!paths[path][method]) {
       const parameters: ParameterObject[] = [
         ...buildParametersFromObject('path', route.params),
         ...buildParametersFromObject('query', route.query),
@@ -199,7 +217,12 @@ export function generateOpenAPI() {
         ...buildParametersFromObject('cookie', route.cookies),
       ]
 
-      const requestBody = buildRequestBody(route.body)
+      const requestBody = buildRequestBody({
+        body: route.body,
+        form: route.form,
+        file: route.file,
+        files: route.files,
+      })
 
       const mergedResponses: Partial<Record<StatusCode, ZodType>> = {
         ...(globalDefaultResponses as Partial<Record<StatusCode, ZodType>>),
@@ -233,7 +256,8 @@ export function generateOpenAPI() {
       if (requestBody) {
         operation.requestBody = requestBody
       }
-      paths[route.path][method] = operation
+
+      paths[path][method] = operation
     }
   }
 

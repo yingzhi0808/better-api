@@ -415,10 +415,7 @@ export class BetterAPI {
 
         if (options?.file) {
           const rawForm = await c.req.parseBody({ all: true })
-          const rawFiles = Object.values(rawForm)
-            .flat()
-            .filter((v) => v instanceof File)
-          const rawFile = rawFiles[0]
+          const rawFile = rawForm.file
           const { success, data, error } =
             await options.file.safeParseAsync(rawFile)
           if (!success) {
@@ -431,9 +428,7 @@ export class BetterAPI {
 
         if (options?.files) {
           const rawForm = await c.req.parseBody({ all: true })
-          const rawFiles = Object.values(rawForm)
-            .flat()
-            .filter((v) => v instanceof File)
+          const rawFiles = Array.isArray(rawForm.files) ? rawForm.files : [rawForm.files]
           const { success, data, error } =
             await options.files.safeParseAsync(rawFiles)
           if (!success) {
