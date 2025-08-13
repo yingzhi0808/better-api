@@ -1,0 +1,85 @@
+{
+  "name": "better-api",
+  "type": "module",
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.14.0",
+  "description": "A modern TypeScript-first OpenAPI document generator that analyzes your code and JSDoc comments to automatically generate comprehensive and accurate API documentation.",
+  "author": "Yingzhi Ji <jiyingzhi0808@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/yingzhi0808/better-api",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yingzhi0808/better-api.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yingzhi0808/better-api/issues"
+  },
+  "keywords": [],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "LICENSE",
+    "README.md",
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18.19.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "start": "node --watch --enable-source-maps --import @oxc-node/core/register src/server.ts",
+    "dev": "node --watch --enable-source-maps --import @oxc-node/core/register src/server.ts",
+    "build": "tsdown",
+    "test": "vitest run --no-isolate --pool=threads",
+    "test:watch": "vitest --no-isolate --pool=threads",
+    "test:coverage": "vitest run --coverage --no-isolate --pool=threads",
+    "docs:dev": "pnpm docs:api && vitepress dev docs",
+    "docs:build": "pnpm docs:api && vitepress build docs",
+    "docs:api": "typedoc",
+    "check": "run-p check:*",
+    "check:type": "tsc",
+    "check:biome": "biome check --fix --no-errors-on-unmatched",
+    "preinstall": "npx only-allow pnpm"
+  },
+  "dependencies": {
+    "@upstash/ratelimit": "^2.0.6",
+    "@upstash/redis": "^1.35.3",
+    "@hono/node-server": "^1.18.2",
+    "@hono/node-ws": "^1.2.0",
+    "@hono/zod-validator": "^0.7.2",
+    "@hyperjump/json-schema": "^1.16.2",
+    "h3": "2.0.0-beta.3",
+    "hono": "^4.9.1",
+    "radashi": "^12.6.1",
+    "supertest": "^7.1.4",
+    "swagger-ui-dist": "^5.27.1",
+    "zod": "^4.0.17"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.1.4",
+    "@oxc-node/core": "^0.0.32",
+    "@types/node": "^24.2.1",
+    "@types/supertest": "^6.0.3",
+    "@vitest/coverage-v8": "^3.2.4",
+    "lefthook": "^1.12.3",
+    "npm-run-all2": "^8.0.4",
+    "tsdown": "^0.14.1",
+    "typedoc": "^0.28.10",
+    "typedoc-plugin-markdown": "^4.8.1",
+    "typedoc-vitepress-theme": "^1.1.2",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitepress": "2.0.0-alpha.5",
+    "vitest": "^3.2.4",
+    "vue": "^3.5.18"
+  }
+}

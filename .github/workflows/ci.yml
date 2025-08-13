@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    if: "${{ !contains(github.event.head_commit.message, 'chore: release') }}"
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node_version: [18.19.0, lts/*, latest]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup node ${{ matrix.node_version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node_version }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Setup Biome
+        uses: biomejs/setup-biome@v2
+
+      - name: Run Biome
+        run: biome ci .
+        if: runner.os == 'Linux' && matrix.node_version == 'latest'
+
+      - name: Type Check
+        run: pnpm check:type
+        if: runner.os == 'Linux' && matrix.node_version == 'latest'
+
+      - name: Run tests and collect coverage
+        run: pnpm test:coverage
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: yingzhi0808/better-api
+
+      - name: Build
+        run: pnpm build
+        if: runner.os == 'Linux' && matrix.node_version == 'latest'
+
+      - name: Release
+        run: pnpx pkg-pr-new publish --compact
+        if: runner.os == 'Linux' && matrix.node_version == 'latest'

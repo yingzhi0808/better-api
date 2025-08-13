@@ -1,0 +1,33 @@
+{
+  "name": "better-api",
+  "entryPoints": [
+    "src/index.ts",
+    "src/express/index.ts",
+    "src/koa/index.ts",
+    "src/hono/index.ts"
+  ],
+  "out": "docs/api",
+  "docsRoot": "docs",
+  "plugin": ["typedoc-plugin-markdown", "typedoc-vitepress-theme"],
+  "exclude": ["**/node_modules/**"],
+  "readme": "none",
+  "gitRevision": "main",
+  "sourceLinkTemplate": "https://github.com/yingzhi0808/better-api/blob/{gitRevision}/{path}#L{line}",
+  "hideBreadcrumbs": true,
+  "navigation": {
+    "includeGroups": false,
+    "includeCategories": true
+  },
+  "indexFormat": "table",
+  "expandParameters": true,
+  "categoryOrder": [
+    "Core",
+    "Builders",
+    "Parsers",
+    "Analyzers",
+    "Types",
+    "Express",
+    "Koa",
+    "Hono"
+  ]
+}
