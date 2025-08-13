@@ -64,10 +64,10 @@ type HeadersOf<T> = T extends ZodObject
   ? z.infer<T> & Record<Lowercase<RequestHeader>, string>
   : Record<Lowercase<RequestHeader>, string>
 type CookiesOf<T> = T extends ZodObject ? z.infer<T> : Cookie
-type BodyOf<T> = T extends ZodType ? z.infer<T> : unknown
-type FormOf<T> = T extends ZodObject ? z.infer<T> : unknown
-type FileOf<T> = T extends ZodFile ? z.infer<T> : File
-type FilesOf<T> = T extends ZodArray<ZodFile> ? z.infer<T> : File[]
+type BodyOf<T> = T extends ZodType ? z.infer<T> : never
+type FormOf<T> = T extends ZodObject ? z.infer<T> : never
+type FileOf<T> = T extends ZodFile ? z.infer<T> : never
+type FilesOf<T> = T extends ZodArray<ZodFile> ? z.infer<T> : never
 
 export class Context<
   ResponseSchema,
@@ -387,10 +387,10 @@ export class BetterAPI {
           typedCookies = data
         }
 
-        const rawBody = await c.req.json()
-        let typedBody: unknown = rawBody
+        let typedBody: unknown | undefined
 
         if (options?.body) {
+          const rawBody = await c.req.json()
           const { success, data, error } =
             await options.body.safeParseAsync(rawBody)
           if (!success) {
@@ -399,37 +399,43 @@ export class BetterAPI {
           typedBody = data
         }
 
-        const rawForm = await c.req.parseBody({ all: true })
-        let typedForm: typeof rawForm | Record<string, unknown> = rawForm
+        let typedForm: unknown | undefined
 
         if (options?.form) {
+          const rawForm = await c.req.parseBody({ all: true })
           const { success, data, error } =
-            await options.form.safeParseAsync(rawBody)
+            await options.form.safeParseAsync(rawForm)
           if (!success) {
             throw new HTTPException(400, { cause: error })
           }
           typedForm = data
         }
 
-        const rawFiles = Object.values(rawForm)
-          .flat()
-          .filter((v) => v instanceof File)
-        let typedFile = rawFiles[0]
+        let typedFile: unknown | undefined
 
         if (options?.file) {
+          const rawForm = await c.req.parseBody({ all: true })
+          const rawFiles = Object.values(rawForm)
+            .flat()
+            .filter((v) => v instanceof File)
+          const rawFile = rawFiles[0]
           const { success, data, error } =
-            await options.file.safeParseAsync(typedFile)
+            await options.file.safeParseAsync(rawFile)
           if (!success) {
             throw new HTTPException(400, { cause: error })
           }
           typedFile = data
         }
 
-        let typedFiles = rawFiles
+        let typedFiles: unknown | undefined
 
         if (options?.files) {
+          const rawForm = await c.req.parseBody({ all: true })
+          const rawFiles = Object.values(rawForm)
+            .flat()
+            .filter((v) => v instanceof File)
           const { success, data, error } =
-            await options.files.safeParseAsync(typedFiles)
+            await options.files.safeParseAsync(rawFiles)
           if (!success) {
             throw new HTTPException(400, { cause: error })
           }
