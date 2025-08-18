@@ -2,7 +2,7 @@ import type { Context as HonoCtx } from 'hono'
 import type { StatusCode } from 'hono/utils/http-status'
 import type { ZodType, z } from 'zod'
 import type { Provider } from '@/core/di'
-import { JsonResponse } from '@/core/response'
+import { HtmlResponse, JsonResponse } from '@/core/response'
 import type {
   BodyOf,
   CookiesOf,
@@ -16,7 +16,7 @@ import type {
   ResponseSchemaMap,
   SchemaToResponse,
   StatusOrInit,
-} from '../hono/api'
+} from '@/hono/api'
 
 export class Context<
   ResponseSchema,
@@ -44,7 +44,7 @@ export class Context<
   ) {}
 
   json<
-    Data extends ResponseSchema extends ResponseSchemaMap
+   const Data extends ResponseSchema extends ResponseSchemaMap
       ? SchemaToResponse<ResponseSchema>[Status & StatusCode]
       : ResponseSchema extends ZodType
         ? z.input<ResponseSchema>
@@ -60,5 +60,18 @@ export class Context<
           : never,
   >(data: Data, statusOrInit?: StatusOrInit<Status>) {
     return new JsonResponse(data, statusOrInit)
+  }
+
+  html<
+   const Data extends string,
+    const Status extends ResponseSchema extends ResponseSchemaMap
+    ? keyof ResponseSchema & StatusCode
+    : ResponseSchema extends ZodType
+      ? 200
+      : ResponseSchema extends undefined
+        ? StatusCode
+        : never,
+  >(data: Data, statusOrInit?: StatusOrInit<Status>) {
+    return new HtmlResponse(data, statusOrInit)
   }
 }

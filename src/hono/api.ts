@@ -33,19 +33,18 @@ export type SchemaToResponse<SchemaMap extends ResponseSchemaMap> = {
 }
 
 export type HandlerReturnType<ResponseSchema> =
-  ResponseSchema extends ResponseSchemaMap
-    ? {
-        [K in keyof ResponseSchema]: K extends StatusCode
-          ?
-              | JsonResponse<SchemaToResponse<ResponseSchema>[K], K>
-              | SchemaToResponse<ResponseSchema>[K]
-          : never
-      }[keyof ResponseSchema]
-    : ResponseSchema extends ZodType
-      ? JsonResponse<z.input<ResponseSchema>, 200> | z.input<ResponseSchema>
-      : ResponseSchema extends undefined
-        ? unknown
-        : never
+  | (ResponseSchema extends ResponseSchemaMap
+      ? {
+          [K in keyof ResponseSchema]: K extends StatusCode
+            ? SchemaToResponse<ResponseSchema>[K]
+            : never
+        }[keyof ResponseSchema]
+      : ResponseSchema extends ZodType
+        ? z.input<ResponseSchema>
+        : ResponseSchema extends undefined
+          ? unknown
+          : never)
+  | Response
 
 export type Provided<
   Deps extends Record<string, Provider<unknown>> | undefined,
