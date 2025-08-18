@@ -38,3 +38,22 @@ export class HtmlResponse<
     })
   }
 }
+
+export class TextResponse<
+  const Body extends string,
+  const Status extends StatusCode = 200,
+> extends Response {
+  constructor(body: Body, statusOrInit?: StatusOrInit<Status>) {
+    const init =
+      typeof statusOrInit === 'object' ? statusOrInit : { status: statusOrInit }
+    const { headers, ...rest } = init
+
+    super(body, {
+      headers: {
+        ...headers,
+        'Content-Type': 'text/plain',
+      },
+      ...rest,
+    })
+  }
+}

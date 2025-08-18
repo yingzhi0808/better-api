@@ -2,7 +2,7 @@ import type { Context as HonoCtx } from 'hono'
 import type { StatusCode } from 'hono/utils/http-status'
 import type { ZodType, z } from 'zod'
 import type { Provider } from '@/core/di'
-import { HtmlResponse, JsonResponse } from '@/core/response'
+import { HtmlResponse, JsonResponse, TextResponse } from '@/core/response'
 import type {
   BodyOf,
   CookiesOf,
@@ -73,5 +73,18 @@ export class Context<
         : never,
   >(data: Data, statusOrInit?: StatusOrInit<Status>) {
     return new HtmlResponse(data, statusOrInit)
+  }
+
+  text<
+  const Data extends string,
+   const Status extends ResponseSchema extends ResponseSchemaMap
+   ? keyof ResponseSchema & StatusCode
+   : ResponseSchema extends ZodType
+     ? 200
+     : ResponseSchema extends undefined
+       ? StatusCode
+       : never,
+ >(data: Data, statusOrInit?: StatusOrInit<Status>) {
+    return new TextResponse(data, statusOrInit)
   }
 }
