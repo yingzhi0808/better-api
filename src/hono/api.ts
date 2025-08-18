@@ -18,14 +18,27 @@ import type { HttpMethod } from '@/types/common'
 import type { SecurityRequirementObject } from '@/types/openapi'
 import { isZodType } from '@/utils/zod'
 
+export type StatusOrInit<Status extends StatusCode> =
+  | Status
+  | (ResponseInit & {
+      status?: Status
+    })
+
 export class JsonResponse<
   Body,
   const Status extends StatusCode = 200,
 > extends Response {
-  constructor(body: Body, status?: Status) {
+  constructor(body: Body, statusOrInit?: StatusOrInit<Status>) {
+    const init =
+      typeof statusOrInit === 'object' ? statusOrInit : { status: statusOrInit }
+    const { headers, ...rest } = init
+
     super(JSON.stringify(body), {
-      status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      ...rest,
     })
   }
 }
@@ -96,15 +109,21 @@ export class Context<
 
   json<
     Data extends ResponseSchema extends ResponseSchemaMap
-      ? SchemaToResponse<ResponseSchema>[Status]
+      ? SchemaToResponse<ResponseSchema>[Status & StatusCode]
       : ResponseSchema extends ZodType
         ? z.input<ResponseSchema>
         : ResponseSchema extends undefined
           ? unknown
           : never,
-    const Status extends StatusCode = 200,
-  >(data: Data, status?: Status) {
-    return new JsonResponse(data, status)
+    const Status extends ResponseSchema extends ResponseSchemaMap
+      ? keyof ResponseSchema & StatusCode
+      : ResponseSchema extends ZodType
+        ? 200
+        : ResponseSchema extends undefined
+          ? StatusCode
+          : never,
+  >(data: Data, statusOrInit?: StatusOrInit<Status>) {
+    return new JsonResponse(data, statusOrInit)
   }
 }
 
@@ -428,7 +447,9 @@ export class BetterAPI {
 
         if (options?.files) {
           const rawForm = await c.req.parseBody({ all: true })
-          const rawFiles = Array.isArray(rawForm.files) ? rawForm.files : [rawForm.files]
+          const rawFiles = Array.isArray(rawForm.files)
+            ? rawForm.files
+            : [rawForm.files]
           const { success, data, error } =
             await options.files.safeParseAsync(rawFiles)
           if (!success) {
@@ -575,7 +596,7 @@ export class BetterAPI {
     ) =>
       | HandlerReturnType<ResponseSchema>
       | Promise<HandlerReturnType<ResponseSchema>>,
-    schema?: RouteOptions<
+    options?: RouteOptions<
       ResponseSchema,
       ParamsSchema,
       QuerySchema,
@@ -599,7 +620,7 @@ export class BetterAPI {
       FileSchema,
       FilesSchema,
       Deps
-    >('post', path, handler, schema)
+    >('post', path, handler, options)
   }
 
   get<
@@ -631,7 +652,7 @@ export class BetterAPI {
     ) =>
       | HandlerReturnType<ResponseSchema>
       | Promise<HandlerReturnType<ResponseSchema>>,
-    schema?: RouteOptions<
+    options?: RouteOptions<
       ResponseSchema,
       ParamsSchema,
       QuerySchema,
@@ -655,7 +676,7 @@ export class BetterAPI {
       FileSchema,
       FilesSchema,
       Deps
-    >('get', path, handler, schema)
+    >('get', path, handler, options)
   }
 
   put<
@@ -687,7 +708,7 @@ export class BetterAPI {
     ) =>
       | HandlerReturnType<ResponseSchema>
       | Promise<HandlerReturnType<ResponseSchema>>,
-    schema?: RouteOptions<
+    options?: RouteOptions<
       ResponseSchema,
       ParamsSchema,
       QuerySchema,
@@ -711,7 +732,7 @@ export class BetterAPI {
       FileSchema,
       FilesSchema,
       Deps
-    >('put', path, handler, schema)
+    >('put', path, handler, options)
   }
 
   delete<
@@ -743,7 +764,7 @@ export class BetterAPI {
     ) =>
       | HandlerReturnType<ResponseSchema>
       | Promise<HandlerReturnType<ResponseSchema>>,
-    schema?: RouteOptions<
+    options?: RouteOptions<
       ResponseSchema,
       ParamsSchema,
       QuerySchema,
@@ -767,7 +788,7 @@ export class BetterAPI {
       FileSchema,
       FilesSchema,
       Deps
-    >('delete', path, handler, schema)
+    >('delete', path, handler, options)
   }
 
   patch<
@@ -799,7 +820,7 @@ export class BetterAPI {
     ) =>
       | HandlerReturnType<ResponseSchema>
       | Promise<HandlerReturnType<ResponseSchema>>,
-    schema?: RouteOptions<
+    options?: RouteOptions<
       ResponseSchema,
       ParamsSchema,
       QuerySchema,
@@ -823,7 +844,7 @@ export class BetterAPI {
       FileSchema,
       FilesSchema,
       Deps
-    >('patch', path, handler, schema)
+    >('patch', path, handler, options)
   }
 
   options<
@@ -855,7 +876,7 @@ export class BetterAPI {
     ) =>
       | HandlerReturnType<ResponseSchema>
       | Promise<HandlerReturnType<ResponseSchema>>,
-    schema?: RouteOptions<
+    options?: RouteOptions<
       ResponseSchema,
       ParamsSchema,
       QuerySchema,
@@ -879,7 +900,7 @@ export class BetterAPI {
       FileSchema,
       FilesSchema,
       Deps
-    >('options', path, handler, schema)
+    >('options', path, handler, options)
   }
 
   head<
@@ -911,7 +932,7 @@ export class BetterAPI {
     ) =>
       | HandlerReturnType<ResponseSchema>
       | Promise<HandlerReturnType<ResponseSchema>>,
-    schema?: RouteOptions<
+    options?: RouteOptions<
       ResponseSchema,
       ParamsSchema,
       QuerySchema,
@@ -935,7 +956,7 @@ export class BetterAPI {
       FileSchema,
       FilesSchema,
       Deps
-    >('head', path, handler, schema)
+    >('head', path, handler, options)
   }
 
   trace<
@@ -967,7 +988,7 @@ export class BetterAPI {
     ) =>
       | HandlerReturnType<ResponseSchema>
       | Promise<HandlerReturnType<ResponseSchema>>,
-    schema?: RouteOptions<
+    options?: RouteOptions<
       ResponseSchema,
       ParamsSchema,
       QuerySchema,
@@ -991,6 +1012,6 @@ export class BetterAPI {
       FileSchema,
       FilesSchema,
       Deps
-    >('trace', path, handler, schema)
+    >('trace', path, handler, options)
   }
 }

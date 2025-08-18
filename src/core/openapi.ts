@@ -81,18 +81,18 @@ export function addGlobalResponse(statusCode: string, zodSchema: ZodType) {
   globalDefaultResponses[statusCode] = zodSchema
 }
 
-export function generateResponsesObject(
+export function buildResponses(
   schema: Partial<Record<StatusCode, ZodType>>,
-  contentType: string = 'application/json',
+  contentType = 'application/json',
 ) {
   const responses: ResponsesObject = {}
 
   for (const [statusCode, zodSchema] of Object.entries(schema)) {
-    const jsonSchema = toJSONSchema(zodSchema)
+    const jsonSchema = toJSONSchema(zodSchema) as SchemaObject & {
+      responseDescription?: string
+    }
     const description =
-      (jsonSchema.responseDescription as string) ||
-      http.STATUS_CODES[statusCode] ||
-      ''
+      jsonSchema.responseDescription || http.STATUS_CODES[statusCode] || ''
 
     delete jsonSchema.responseDescription
 
@@ -100,7 +100,7 @@ export function generateResponsesObject(
       description,
       content: {
         [contentType]: {
-          schema: jsonSchema as SchemaObject,
+          schema: jsonSchema,
         },
       },
     }
@@ -224,14 +224,15 @@ export function generateOpenAPI() {
         files: route.files,
       })
 
-      const mergedResponses: Partial<Record<StatusCode, ZodType>> = {
-        ...(globalDefaultResponses as Partial<Record<StatusCode, ZodType>>),
+      const mergedResponses = {
+        ...globalDefaultResponses,
         ...route.response,
       }
 
       const operation: OperationObject = {
-        responses: generateResponsesObject(mergedResponses),
+        responses: buildResponses(mergedResponses),
       }
+
       if (route.summary) {
         operation.summary = route.summary
       }
@@ -250,7 +251,7 @@ export function generateOpenAPI() {
       if (route.security) {
         operation.security = route.security
       }
-      if (parameters.length) {
+      if (parameters.length > 0) {
         operation.parameters = parameters
       }
       if (requestBody) {
