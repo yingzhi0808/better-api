@@ -5,6 +5,7 @@ import type { Cookie } from 'hono/utils/cookie'
 import type { RequestHeader } from 'hono/utils/headers'
 import type { StatusCode } from 'hono/utils/http-status'
 import type { ZodArray, ZodFile, ZodObject, ZodType, z } from 'zod'
+import { Context } from '@/core/context'
 import {
   kSecurityMeta,
   type Provider,
@@ -13,6 +14,7 @@ import {
   runWithRequestScope,
 } from '@/core/di'
 import { addRouteSchema } from '@/core/openapi'
+import { JsonResponse } from '@/core/response'
 import type { RouteDefinition } from '@/hono/route'
 import type { HttpMethod } from '@/types/common'
 import type { SecurityRequirementObject } from '@/types/openapi'
@@ -24,28 +26,9 @@ export type StatusOrInit<Status extends StatusCode> =
       status?: Status
     })
 
-export class JsonResponse<
-  Body,
-  const Status extends StatusCode = 200,
-> extends Response {
-  constructor(body: Body, statusOrInit?: StatusOrInit<Status>) {
-    const init =
-      typeof statusOrInit === 'object' ? statusOrInit : { status: statusOrInit }
-    const { headers, ...rest } = init
-
-    super(JSON.stringify(body), {
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
-      ...rest,
-    })
-  }
-}
-
 export type ResponseSchemaMap = Partial<Record<StatusCode, ZodType>>
 
-type SchemaToResponse<SchemaMap extends ResponseSchemaMap> = {
+export type SchemaToResponse<SchemaMap extends ResponseSchemaMap> = {
   [Status in keyof SchemaMap]: z.input<SchemaMap[Status]>
 }
 
@@ -64,68 +47,26 @@ export type HandlerReturnType<ResponseSchema> =
         ? unknown
         : never
 
-type Provided<Deps extends Record<string, Provider<unknown>> | undefined> =
-  Deps extends Record<string, Provider<unknown>>
-    ? { [K in keyof Deps]: Promise<Awaited<ReturnType<Deps[K]>>> }
-    : undefined
+export type Provided<
+  Deps extends Record<string, Provider<unknown>> | undefined,
+> = Deps extends Record<string, Provider<unknown>>
+  ? { [K in keyof Deps]: Promise<Awaited<ReturnType<Deps[K]>>> }
+  : undefined
 
-type ParamsOf<T> = T extends ZodObject ? z.infer<T> : Record<string, string>
-type QueryOf<T> = T extends ZodObject
+export type ParamsOf<T> = T extends ZodObject
+  ? z.infer<T>
+  : Record<string, string>
+export type QueryOf<T> = T extends ZodObject
   ? z.infer<T>
   : Record<string, string | string[]>
-type HeadersOf<T> = T extends ZodObject
+export type HeadersOf<T> = T extends ZodObject
   ? z.infer<T> & Record<Lowercase<RequestHeader>, string>
   : Record<Lowercase<RequestHeader>, string>
-type CookiesOf<T> = T extends ZodObject ? z.infer<T> : Cookie
-type BodyOf<T> = T extends ZodType ? z.infer<T> : never
-type FormOf<T> = T extends ZodObject ? z.infer<T> : never
-type FileOf<T> = T extends ZodFile ? z.infer<T> : never
-type FilesOf<T> = T extends ZodArray<ZodFile> ? z.infer<T> : never
-
-export class Context<
-  ResponseSchema,
-  ParamsSchema,
-  QuerySchema,
-  HeadersSchema,
-  CookiesSchema,
-  BodySchema,
-  FormSchema,
-  FileSchema,
-  FilesSchema,
-  Deps extends Record<string, Provider<unknown>> | undefined,
-> {
-  constructor(
-    public readonly hono: HonoCtx,
-    public readonly params: ParamsOf<ParamsSchema>,
-    public readonly query: QueryOf<QuerySchema>,
-    public readonly headers: HeadersOf<HeadersSchema>,
-    public readonly cookies: CookiesOf<CookiesSchema>,
-    public readonly body: BodyOf<BodySchema>,
-    public readonly form: FormOf<FormSchema>,
-    public readonly file: FileOf<FileSchema>,
-    public readonly files: FilesOf<FilesSchema>,
-    public readonly deps: Provided<Deps>,
-  ) {}
-
-  json<
-    Data extends ResponseSchema extends ResponseSchemaMap
-      ? SchemaToResponse<ResponseSchema>[Status & StatusCode]
-      : ResponseSchema extends ZodType
-        ? z.input<ResponseSchema>
-        : ResponseSchema extends undefined
-          ? unknown
-          : never,
-    const Status extends ResponseSchema extends ResponseSchemaMap
-      ? keyof ResponseSchema & StatusCode
-      : ResponseSchema extends ZodType
-        ? 200
-        : ResponseSchema extends undefined
-          ? StatusCode
-          : never,
-  >(data: Data, statusOrInit?: StatusOrInit<Status>) {
-    return new JsonResponse(data, statusOrInit)
-  }
-}
+export type CookiesOf<T> = T extends ZodObject ? z.infer<T> : Cookie
+export type BodyOf<T> = T extends ZodType ? z.infer<T> : never
+export type FormOf<T> = T extends ZodObject ? z.infer<T> : never
+export type FileOf<T> = T extends ZodFile ? z.infer<T> : never
+export type FilesOf<T> = T extends ZodArray<ZodFile> ? z.infer<T> : never
 
 export interface RouteOptions<
   ResponseSchema,
@@ -184,6 +125,9 @@ export class BetterAPI {
     HeadersSchema extends ZodObject | undefined = undefined,
     CookiesSchema extends ZodObject | undefined = undefined,
     BodySchema extends ZodType | undefined = undefined,
+    FormSchema extends ZodObject | undefined = undefined,
+    FileSchema extends ZodFile | undefined = undefined,
+    FilesSchema extends ZodArray<ZodFile> | undefined = undefined,
     Deps extends Record<string, Provider<unknown>> | undefined = undefined,
   >(
     def: RouteDefinition<
@@ -193,6 +137,9 @@ export class BetterAPI {
       HeadersSchema,
       CookiesSchema,
       BodySchema,
+      FormSchema,
+      FileSchema,
+      FilesSchema,
       Deps
     >,
   ) {

@@ -2,12 +2,12 @@ import type z from 'zod'
 import type { ZodObject } from 'zod'
 import type { Provider } from '@/core/di'
 import type {
-  Context as BetterContext,
   HandlerReturnType,
   ResponseSchemaMap,
   RouteOptions,
 } from '@/hono/api'
 import type { HttpMethod } from '@/types/common'
+import type { Context as BetterContext } from '../core/context'
 
 export function route<
   ResponseSchema extends
