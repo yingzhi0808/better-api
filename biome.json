@@ -13,12 +13,10 @@
       "suspicious": {
         "noExplicitAny": "error"
       },
-      "nursery": {
-        "useConsistentObjectDefinition": "error"
-      },
       "style": {
         "noNonNullAssertion": "off",
-        "useBlockStatements": "error"
+        "useBlockStatements": "error",
+        "useConsistentObjectDefinitions": "error"
       },
       "correctness": {
         "noUnusedImports": "off",
