@@ -24,9 +24,6 @@
         "noUnusedImports": "off",
         "noUnusedFunctionParameters": "off",
         "noUnusedVariables": "off"
-      },
-      "complexity": {
-        "noBannedTypes": "off"
       }
     }
   },
