@@ -4,7 +4,7 @@ import { HTTPException } from 'hono/http-exception'
 import type { Cookie } from 'hono/utils/cookie'
 import type { RequestHeader } from 'hono/utils/headers'
 import type { StatusCode } from 'hono/utils/http-status'
-import type { ZodArray, ZodFile, ZodObject, ZodType, z } from 'zod'
+import type { ZodArray, ZodFile, ZodObject, ZodType } from 'zod'
 import { Context } from '@/core/context'
 import {
   kSecurityMeta,
@@ -18,33 +18,102 @@ import { JsonResponse } from '@/core/response'
 import type { RouteDefinition } from '@/hono/route'
 import type { HttpMethod } from '@/types/common'
 import type { SecurityRequirementObject } from '@/types/openapi'
+import type {
+  InferAllResponses,
+  InferBody,
+  InferCookies,
+  InferFile,
+  InferFiles,
+  InferForm,
+  InferHeaders,
+  InferParams,
+  InferQuery,
+  SimplifiedZodResponseObject,
+  ZodResponseObject,
+} from '@/types/zod'
+import {
+  isSimplifiedZodResponseObject,
+  isStatusResponseMap,
+  isZodResponseObject,
+} from '@/utils/response'
 import { isZodType } from '@/utils/zod'
 
-export type StatusOrInit<Status extends StatusCode> =
-  | Status
-  | (ResponseInit & {
-      status?: Status
-    })
+// 转换响应配置为OpenAPI兼容格式
+function convertResponseSchema(response: ResponseSpec) {
+  if (!response) {
+    return undefined
+  }
 
-export type ResponseSchemaMap = Partial<Record<StatusCode, ZodType>>
+  // 情况1: 直接的ZodType
+  if (isZodType(response)) {
+    return { 200: response }
+  }
 
-export type SchemaToResponse<SchemaMap extends ResponseSchemaMap> = {
-  [Status in keyof SchemaMap]: z.input<SchemaMap[Status]>
+  // 情况2: StatusResponseMap (包含ZodType、ResponseConfig或ResponseConfigWithContent)
+  if (isStatusResponseMap(response)) {
+    const result: Record<string, unknown> = {}
+    for (const [statusCode, config] of Object.entries(response)) {
+      if (isZodType(config)) {
+        // 原ResponseSchemaMap的情况：直接的ZodType
+        result[statusCode] = config
+      } else if (isSimplifiedZodResponseObject(config)) {
+        // { description, schema } -> 默认为JSON，保留所有其他字段
+        result[statusCode] = {
+          ...config,
+          contentType: 'application/json',
+        }
+      } else if (isZodResponseObject(config)) {
+        // { description, content } -> 保持原有结构
+        result[statusCode] = config
+      }
+    }
+    return result
+  }
+
+  return response
 }
 
-export type HandlerReturnType<ResponseSchema> =
-  | (ResponseSchema extends ResponseSchemaMap
-      ? {
-          [K in keyof ResponseSchema]: K extends StatusCode
-            ? SchemaToResponse<ResponseSchema>[K]
-            : never
-        }[keyof ResponseSchema]
-      : ResponseSchema extends ZodType
-        ? z.input<ResponseSchema>
-        : ResponseSchema extends undefined
-          ? unknown
-          : never)
+// 获取用于校验的schema
+function getValidationSchema(response: ResponseSpec, statusCode: StatusCode) {
+  if (isZodType(response)) {
+    return response
+  }
+
+  if (isStatusResponseMap(response)) {
+    const config = response[statusCode]
+    if (!config) {
+      return null
+    }
+
+    if (isZodType(config)) {
+      return config
+    }
+    if (isSimplifiedZodResponseObject(config)) {
+      return config.schema
+    }
+    if (isZodResponseObject(config)) {
+      const jsonContent = config.content['application/json']
+      return jsonContent.schema
+    }
+  }
+
+  return null
+}
+
+// 统一的ResponseConfigMap类型，支持三种值类型：
+// 1. ZodType - 向后兼容原ResponseSchemaMap
+// 2. ZodResponseConfig - { description, schema, ... }
+// 3. ZodResponseObject - { description, content, ... }
+export type StatusResponseMap = Partial<
+  Record<StatusCode, ZodType | SimplifiedZodResponseObject | ZodResponseObject>
+>
+
+export type ResponseSpec = StatusResponseMap | ZodType | undefined
+
+export type HandlerReturnType<ResponseDefinition> =
+  | InferAllResponses<ResponseDefinition>
   | Response
+  | Promise<InferAllResponses<ResponseDefinition> | Response>
 
 export type Provided<
   Deps extends Record<string, Provider<unknown>> | undefined,
@@ -52,42 +121,27 @@ export type Provided<
   ? { [K in keyof Deps]: Promise<Awaited<ReturnType<Deps[K]>>> }
   : undefined
 
-export type ParamsOf<T> = T extends ZodObject
-  ? z.infer<T>
-  : Record<string, string>
-export type QueryOf<T> = T extends ZodObject
-  ? z.infer<T>
-  : Record<string, string | string[]>
-export type HeadersOf<T> = T extends ZodObject
-  ? z.infer<T> & Record<Lowercase<RequestHeader>, string>
-  : Record<Lowercase<RequestHeader>, string>
-export type CookiesOf<T> = T extends ZodObject ? z.infer<T> : Cookie
-export type BodyOf<T> = T extends ZodType ? z.infer<T> : never
-export type FormOf<T> = T extends ZodObject ? z.infer<T> : never
-export type FileOf<T> = T extends ZodFile ? z.infer<T> : never
-export type FilesOf<T> = T extends ZodArray<ZodFile> ? z.infer<T> : never
-
-export interface RouteOptions<
-  ResponseSchema,
-  ParamsSchema,
-  QuerySchema,
-  HeadersSchema,
-  CookiesSchema,
-  BodySchema,
-  FormSchema,
-  FileSchema,
-  FilesSchema,
+export interface RouteConfig<
+  ResponseDefinition,
+  ParamsDefinition,
+  QueryDefinition,
+  HeadersDefinition,
+  CookiesDefinition,
+  BodyDefinition,
+  FormDefinition,
+  FileDefinition,
+  FilesDefinition,
   Deps,
 > {
-  response?: ResponseSchema
-  params?: ParamsSchema
-  query?: QuerySchema
-  headers?: HeadersSchema
-  cookies?: CookiesSchema
-  body?: BodySchema
-  form?: FormSchema
-  file?: FileSchema
-  files?: FilesSchema
+  response?: ResponseDefinition
+  params?: ParamsDefinition
+  query?: QueryDefinition
+  headers?: HeadersDefinition
+  cookies?: CookiesDefinition
+  body?: BodyDefinition
+  form?: FormDefinition
+  file?: FileDefinition
+  files?: FilesDefinition
   deps?: Deps
   summary?: string
   description?: string
@@ -118,27 +172,27 @@ export class BetterAPI {
 
   // 单个挂载
   mount<
-    ResponseSchema extends ResponseSchemaMap | ZodType | undefined = undefined,
-    ParamsSchema extends ZodObject | undefined = undefined,
-    QuerySchema extends ZodObject | undefined = undefined,
-    HeadersSchema extends ZodObject | undefined = undefined,
-    CookiesSchema extends ZodObject | undefined = undefined,
-    BodySchema extends ZodType | undefined = undefined,
-    FormSchema extends ZodObject | undefined = undefined,
-    FileSchema extends ZodFile | undefined = undefined,
-    FilesSchema extends ZodArray<ZodFile> | undefined = undefined,
+    ResponseDefinition extends ResponseSpec = undefined,
+    ParamsDefinition extends ZodObject | undefined = undefined,
+    QueryDefinition extends ZodObject | undefined = undefined,
+    HeadersDefinition extends ZodObject | undefined = undefined,
+    CookiesDefinition extends ZodObject | undefined = undefined,
+    BodyDefinition extends ZodType | undefined = undefined,
+    FormDefinition extends ZodObject | undefined = undefined,
+    FileDefinition extends ZodFile | undefined = undefined,
+    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
     Deps extends Record<string, Provider<unknown>> | undefined = undefined,
   >(
     def: RouteDefinition<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >,
   ) {
@@ -202,45 +256,43 @@ export class BetterAPI {
   }
 
   private registerRoute<
-    ResponseSchema extends ResponseSchemaMap | ZodType | undefined = undefined,
-    ParamsSchema extends ZodObject | undefined = undefined,
-    QuerySchema extends ZodObject | undefined = undefined,
-    HeadersSchema extends ZodObject | undefined = undefined,
-    CookiesSchema extends ZodObject | undefined = undefined,
-    BodySchema extends ZodType | undefined = undefined,
-    FormSchema extends ZodObject | undefined = undefined,
-    FileSchema extends ZodFile | undefined = undefined,
-    FilesSchema extends ZodArray<ZodFile> | undefined = undefined,
+    ResponseDefinition extends ResponseSpec = undefined,
+    ParamsDefinition extends ZodObject | undefined = undefined,
+    QueryDefinition extends ZodObject | undefined = undefined,
+    HeadersDefinition extends ZodObject | undefined = undefined,
+    CookiesDefinition extends ZodObject | undefined = undefined,
+    BodyDefinition extends ZodType | undefined = undefined,
+    FormDefinition extends ZodObject | undefined = undefined,
+    FileDefinition extends ZodFile | undefined = undefined,
+    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
     Deps extends Record<string, Provider<unknown>> | undefined = undefined,
   >(
     method: HttpMethod,
     path: string,
     handler: (
       context: Context<
-        ResponseSchema,
-        ParamsSchema,
-        QuerySchema,
-        HeadersSchema,
-        CookiesSchema,
-        BodySchema,
-        FormSchema,
-        FileSchema,
-        FilesSchema,
+        ResponseDefinition,
+        ParamsDefinition,
+        QueryDefinition,
+        HeadersDefinition,
+        CookiesDefinition,
+        BodyDefinition,
+        FormDefinition,
+        FileDefinition,
+        FilesDefinition,
         Deps
       >,
-    ) =>
-      | HandlerReturnType<ResponseSchema>
-      | Promise<HandlerReturnType<ResponseSchema>>,
-    options?: RouteOptions<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+    ) => HandlerReturnType<ResponseDefinition>,
+    options?: RouteConfig<
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >,
   ) {
@@ -266,12 +318,13 @@ export class BetterAPI {
       }
     }
 
+    // 转换响应配置为OpenAPI兼容格式
+    const convertedResponse = convertResponseSchema(options?.response)
+
     addRouteSchema({
       path,
       method,
-      response: isZodType(options?.response)
-        ? { 200: options?.response }
-        : options?.response,
+      response: convertedResponse,
       params: options?.params,
       query: options?.query,
       headers: options?.headers,
@@ -422,66 +475,65 @@ export class BetterAPI {
         }
 
         const context = new Context<
-          ResponseSchema,
-          ParamsSchema,
-          QuerySchema,
-          HeadersSchema,
-          CookiesSchema,
-          BodySchema,
-          FormSchema,
-          FileSchema,
-          FilesSchema,
+          ResponseDefinition,
+          ParamsDefinition,
+          QueryDefinition,
+          HeadersDefinition,
+          CookiesDefinition,
+          BodyDefinition,
+          FormDefinition,
+          FileDefinition,
+          FilesDefinition,
           Deps
         >(
           c,
-          typedParams as ParamsOf<ParamsSchema>,
-          typedQuery as QueryOf<QuerySchema>,
-          typedHeaders as HeadersOf<HeadersSchema>,
-          typedCookies as CookiesOf<CookiesSchema>,
-          typedBody as BodyOf<BodySchema>,
-          typedForm as FormOf<FormSchema>,
-          typedFile as FileOf<FileSchema>,
-          typedFiles as FilesOf<FilesSchema>,
+          typedParams as InferParams<ParamsDefinition>,
+          typedQuery as InferQuery<QueryDefinition>,
+          typedHeaders as InferHeaders<HeadersDefinition>,
+          typedCookies as InferCookies<CookiesDefinition>,
+          typedBody as InferBody<BodyDefinition>,
+          typedForm as InferForm<FormDefinition>,
+          typedFile as InferFile<FileDefinition>,
+          typedFiles as InferFiles<FilesDefinition>,
           depsObject,
         )
 
-        let result: unknown
-        result = await handler(context)
+        const result = await handler(context)
 
-        if (!options?.response) {
-          const resMaybe = result as JsonResponse<unknown, StatusCode> | unknown
-          const responseFinal =
-            resMaybe instanceof JsonResponse
-              ? resMaybe
-              : new JsonResponse(result as unknown, 200)
-          return responseFinal
+        if (options?.response) {
+          // 只对JSON响应进行校验
+          const shouldValidate =
+            result instanceof JsonResponse || !(result instanceof Response)
+
+          if (shouldValidate) {
+            const responseData =
+              result instanceof JsonResponse
+                ? await result.clone().json()
+                : result
+            const statusCode =
+              result instanceof JsonResponse
+                ? (result.status as StatusCode)
+                : 200
+
+            // 获取用于校验的schema
+            const validationSchema = getValidationSchema(
+              options.response,
+              statusCode,
+            )
+
+            if (validationSchema) {
+              const { success, data, error } =
+                await validationSchema.safeParseAsync(responseData)
+              if (success) {
+                return new JsonResponse(data, statusCode)
+              }
+
+              throw new HTTPException(500, { cause: error })
+            }
+          }
         }
 
-        const resMaybe = result as JsonResponse<unknown, StatusCode> | unknown
-        const responseData = await (resMaybe instanceof JsonResponse
-          ? resMaybe.clone().json()
-          : result)
-        const statusCode =
-          resMaybe instanceof JsonResponse
-            ? (resMaybe.status as StatusCode)
-            : 200
-        const schemaForStatus = isZodType(options.response)
-          ? options.response
-          : options.response[statusCode]!
-
-        const { success, data, error } =
-          await schemaForStatus.safeParseAsync(responseData)
-        if (success) {
-          const responseFinal = new JsonResponse(data as unknown, statusCode)
-          return responseFinal
-        }
-
-        throw new HTTPException(500, {
-          res: new JsonResponse(
-            { message: 'Response validation failed', issues: error.issues },
-            500,
-          ),
-        })
+        return result
       })
     }
 
@@ -514,449 +566,433 @@ export class BetterAPI {
   }
 
   post<
-    ResponseSchema extends ResponseSchemaMap | ZodType | undefined = undefined,
-    ParamsSchema extends ZodObject | undefined = undefined,
-    QuerySchema extends ZodObject | undefined = undefined,
-    HeadersSchema extends ZodObject | undefined = undefined,
-    CookiesSchema extends ZodObject | undefined = undefined,
-    BodySchema extends ZodType | undefined = undefined,
-    FormSchema extends ZodObject | undefined = undefined,
-    FileSchema extends ZodFile | undefined = undefined,
-    FilesSchema extends ZodArray<ZodFile> | undefined = undefined,
+    ResponseDefinition extends ResponseSpec = undefined,
+    ParamsDefinition extends ZodObject | undefined = undefined,
+    QueryDefinition extends ZodObject | undefined = undefined,
+    HeadersDefinition extends ZodObject | undefined = undefined,
+    CookiesDefinition extends ZodObject | undefined = undefined,
+    BodyDefinition extends ZodType | undefined = undefined,
+    FormDefinition extends ZodObject | undefined = undefined,
+    FileDefinition extends ZodFile | undefined = undefined,
+    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
     Deps extends Record<string, Provider<unknown>> | undefined = undefined,
   >(
     path: string,
     handler: (
       context: Context<
-        ResponseSchema,
-        ParamsSchema,
-        QuerySchema,
-        HeadersSchema,
-        CookiesSchema,
-        BodySchema,
-        FormSchema,
-        FileSchema,
-        FilesSchema,
+        ResponseDefinition,
+        ParamsDefinition,
+        QueryDefinition,
+        HeadersDefinition,
+        CookiesDefinition,
+        BodyDefinition,
+        FormDefinition,
+        FileDefinition,
+        FilesDefinition,
         Deps
       >,
-    ) =>
-      | HandlerReturnType<ResponseSchema>
-      | Promise<HandlerReturnType<ResponseSchema>>,
-    options?: RouteOptions<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+    ) => HandlerReturnType<ResponseDefinition>,
+    options?: RouteConfig<
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >,
   ) {
     this.registerRoute<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >('post', path, handler, options)
   }
 
   get<
-    ResponseSchema extends ResponseSchemaMap | ZodType | undefined = undefined,
-    ParamsSchema extends ZodObject | undefined = undefined,
-    QuerySchema extends ZodObject | undefined = undefined,
-    HeadersSchema extends ZodObject | undefined = undefined,
-    CookiesSchema extends ZodObject | undefined = undefined,
-    BodySchema extends ZodType | undefined = undefined,
-    FormSchema extends ZodObject | undefined = undefined,
-    FileSchema extends ZodFile | undefined = undefined,
-    FilesSchema extends ZodArray<ZodFile> | undefined = undefined,
+    ResponseDefinition extends ResponseSpec = undefined,
+    ParamsDefinition extends ZodObject | undefined = undefined,
+    QueryDefinition extends ZodObject | undefined = undefined,
+    HeadersDefinition extends ZodObject | undefined = undefined,
+    CookiesDefinition extends ZodObject | undefined = undefined,
+    BodyDefinition extends ZodType | undefined = undefined,
+    FormDefinition extends ZodObject | undefined = undefined,
+    FileDefinition extends ZodFile | undefined = undefined,
+    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
     Deps extends Record<string, Provider<unknown>> | undefined = undefined,
   >(
     path: string,
     handler: (
       context: Context<
-        ResponseSchema,
-        ParamsSchema,
-        QuerySchema,
-        HeadersSchema,
-        CookiesSchema,
-        BodySchema,
-        FormSchema,
-        FileSchema,
-        FilesSchema,
+        ResponseDefinition,
+        ParamsDefinition,
+        QueryDefinition,
+        HeadersDefinition,
+        CookiesDefinition,
+        BodyDefinition,
+        FormDefinition,
+        FileDefinition,
+        FilesDefinition,
         Deps
       >,
-    ) =>
-      | HandlerReturnType<ResponseSchema>
-      | Promise<HandlerReturnType<ResponseSchema>>,
-    options?: RouteOptions<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+    ) => HandlerReturnType<ResponseDefinition>,
+    options?: RouteConfig<
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >,
   ) {
     this.registerRoute<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >('get', path, handler, options)
   }
 
   put<
-    ResponseSchema extends ResponseSchemaMap | ZodType | undefined = undefined,
-    ParamsSchema extends ZodObject | undefined = undefined,
-    QuerySchema extends ZodObject | undefined = undefined,
-    HeadersSchema extends ZodObject | undefined = undefined,
-    CookiesSchema extends ZodObject | undefined = undefined,
-    BodySchema extends ZodType | undefined = undefined,
-    FormSchema extends ZodObject | undefined = undefined,
-    FileSchema extends ZodFile | undefined = undefined,
-    FilesSchema extends ZodArray<ZodFile> | undefined = undefined,
+    ResponseDefinition extends ResponseSpec = undefined,
+    ParamsDefinition extends ZodObject | undefined = undefined,
+    QueryDefinition extends ZodObject | undefined = undefined,
+    HeadersDefinition extends ZodObject | undefined = undefined,
+    CookiesDefinition extends ZodObject | undefined = undefined,
+    BodyDefinition extends ZodType | undefined = undefined,
+    FormDefinition extends ZodObject | undefined = undefined,
+    FileDefinition extends ZodFile | undefined = undefined,
+    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
     Deps extends Record<string, Provider<unknown>> | undefined = undefined,
   >(
     path: string,
     handler: (
       context: Context<
-        ResponseSchema,
-        ParamsSchema,
-        QuerySchema,
-        HeadersSchema,
-        CookiesSchema,
-        BodySchema,
-        FormSchema,
-        FileSchema,
-        FilesSchema,
+        ResponseDefinition,
+        ParamsDefinition,
+        QueryDefinition,
+        HeadersDefinition,
+        CookiesDefinition,
+        BodyDefinition,
+        FormDefinition,
+        FileDefinition,
+        FilesDefinition,
         Deps
       >,
-    ) =>
-      | HandlerReturnType<ResponseSchema>
-      | Promise<HandlerReturnType<ResponseSchema>>,
-    options?: RouteOptions<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+    ) => HandlerReturnType<ResponseDefinition>,
+    options?: RouteConfig<
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >,
   ) {
     this.registerRoute<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >('put', path, handler, options)
   }
 
   delete<
-    ResponseSchema extends ResponseSchemaMap | ZodType | undefined = undefined,
-    ParamsSchema extends ZodObject | undefined = undefined,
-    QuerySchema extends ZodObject | undefined = undefined,
-    HeadersSchema extends ZodObject | undefined = undefined,
-    CookiesSchema extends ZodObject | undefined = undefined,
-    BodySchema extends ZodType | undefined = undefined,
-    FormSchema extends ZodObject | undefined = undefined,
-    FileSchema extends ZodFile | undefined = undefined,
-    FilesSchema extends ZodArray<ZodFile> | undefined = undefined,
+    ResponseDefinition extends ResponseSpec = undefined,
+    ParamsDefinition extends ZodObject | undefined = undefined,
+    QueryDefinition extends ZodObject | undefined = undefined,
+    HeadersDefinition extends ZodObject | undefined = undefined,
+    CookiesDefinition extends ZodObject | undefined = undefined,
+    BodyDefinition extends ZodType | undefined = undefined,
+    FormDefinition extends ZodObject | undefined = undefined,
+    FileDefinition extends ZodFile | undefined = undefined,
+    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
     Deps extends Record<string, Provider<unknown>> | undefined = undefined,
   >(
     path: string,
     handler: (
       context: Context<
-        ResponseSchema,
-        ParamsSchema,
-        QuerySchema,
-        HeadersSchema,
-        CookiesSchema,
-        BodySchema,
-        FormSchema,
-        FileSchema,
-        FilesSchema,
+        ResponseDefinition,
+        ParamsDefinition,
+        QueryDefinition,
+        HeadersDefinition,
+        CookiesDefinition,
+        BodyDefinition,
+        FormDefinition,
+        FileDefinition,
+        FilesDefinition,
         Deps
       >,
-    ) =>
-      | HandlerReturnType<ResponseSchema>
-      | Promise<HandlerReturnType<ResponseSchema>>,
-    options?: RouteOptions<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+    ) => HandlerReturnType<ResponseDefinition>,
+    options?: RouteConfig<
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >,
   ) {
     this.registerRoute<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >('delete', path, handler, options)
   }
 
   patch<
-    ResponseSchema extends ResponseSchemaMap | ZodType | undefined = undefined,
-    ParamsSchema extends ZodObject | undefined = undefined,
-    QuerySchema extends ZodObject | undefined = undefined,
-    HeadersSchema extends ZodObject | undefined = undefined,
-    CookiesSchema extends ZodObject | undefined = undefined,
-    BodySchema extends ZodType | undefined = undefined,
-    FormSchema extends ZodObject | undefined = undefined,
-    FileSchema extends ZodFile | undefined = undefined,
-    FilesSchema extends ZodArray<ZodFile> | undefined = undefined,
+    ResponseDefinition extends ResponseSpec = undefined,
+    ParamsDefinition extends ZodObject | undefined = undefined,
+    QueryDefinition extends ZodObject | undefined = undefined,
+    HeadersDefinition extends ZodObject | undefined = undefined,
+    CookiesDefinition extends ZodObject | undefined = undefined,
+    BodyDefinition extends ZodType | undefined = undefined,
+    FormDefinition extends ZodObject | undefined = undefined,
+    FileDefinition extends ZodFile | undefined = undefined,
+    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
     Deps extends Record<string, Provider<unknown>> | undefined = undefined,
   >(
     path: string,
     handler: (
       context: Context<
-        ResponseSchema,
-        ParamsSchema,
-        QuerySchema,
-        HeadersSchema,
-        CookiesSchema,
-        BodySchema,
-        FormSchema,
-        FileSchema,
-        FilesSchema,
+        ResponseDefinition,
+        ParamsDefinition,
+        QueryDefinition,
+        HeadersDefinition,
+        CookiesDefinition,
+        BodyDefinition,
+        FormDefinition,
+        FileDefinition,
+        FilesDefinition,
         Deps
       >,
-    ) =>
-      | HandlerReturnType<ResponseSchema>
-      | Promise<HandlerReturnType<ResponseSchema>>,
-    options?: RouteOptions<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+    ) => HandlerReturnType<ResponseDefinition>,
+    options?: RouteConfig<
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >,
   ) {
     this.registerRoute<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >('patch', path, handler, options)
   }
 
   options<
-    ResponseSchema extends ResponseSchemaMap | ZodType | undefined = undefined,
-    ParamsSchema extends ZodObject | undefined = undefined,
-    QuerySchema extends ZodObject | undefined = undefined,
-    HeadersSchema extends ZodObject | undefined = undefined,
-    CookiesSchema extends ZodObject | undefined = undefined,
-    BodySchema extends ZodType | undefined = undefined,
-    FormSchema extends ZodObject | undefined = undefined,
-    FileSchema extends ZodFile | undefined = undefined,
-    FilesSchema extends ZodArray<ZodFile> | undefined = undefined,
+    ResponseDefinition extends ResponseSpec = undefined,
+    ParamsDefinition extends ZodObject | undefined = undefined,
+    QueryDefinition extends ZodObject | undefined = undefined,
+    HeadersDefinition extends ZodObject | undefined = undefined,
+    CookiesDefinition extends ZodObject | undefined = undefined,
+    BodyDefinition extends ZodType | undefined = undefined,
+    FormDefinition extends ZodObject | undefined = undefined,
+    FileDefinition extends ZodFile | undefined = undefined,
+    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
     Deps extends Record<string, Provider<unknown>> | undefined = undefined,
   >(
     path: string,
     handler: (
       context: Context<
-        ResponseSchema,
-        ParamsSchema,
-        QuerySchema,
-        HeadersSchema,
-        CookiesSchema,
-        BodySchema,
-        FormSchema,
-        FileSchema,
-        FilesSchema,
+        ResponseDefinition,
+        ParamsDefinition,
+        QueryDefinition,
+        HeadersDefinition,
+        CookiesDefinition,
+        BodyDefinition,
+        FormDefinition,
+        FileDefinition,
+        FilesDefinition,
         Deps
       >,
-    ) =>
-      | HandlerReturnType<ResponseSchema>
-      | Promise<HandlerReturnType<ResponseSchema>>,
-    options?: RouteOptions<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+    ) => HandlerReturnType<ResponseDefinition>,
+    options?: RouteConfig<
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >,
   ) {
     this.registerRoute<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >('options', path, handler, options)
   }
 
   head<
-    ResponseSchema extends ResponseSchemaMap | ZodType | undefined = undefined,
-    ParamsSchema extends ZodObject | undefined = undefined,
-    QuerySchema extends ZodObject | undefined = undefined,
-    HeadersSchema extends ZodObject | undefined = undefined,
-    CookiesSchema extends ZodObject | undefined = undefined,
-    BodySchema extends ZodType | undefined = undefined,
-    FormSchema extends ZodObject | undefined = undefined,
-    FileSchema extends ZodFile | undefined = undefined,
-    FilesSchema extends ZodArray<ZodFile> | undefined = undefined,
+    ResponseDefinition extends ResponseSpec = undefined,
+    ParamsDefinition extends ZodObject | undefined = undefined,
+    QueryDefinition extends ZodObject | undefined = undefined,
+    HeadersDefinition extends ZodObject | undefined = undefined,
+    CookiesDefinition extends ZodObject | undefined = undefined,
+    BodyDefinition extends ZodType | undefined = undefined,
+    FormDefinition extends ZodObject | undefined = undefined,
+    FileDefinition extends ZodFile | undefined = undefined,
+    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
     Deps extends Record<string, Provider<unknown>> | undefined = undefined,
   >(
     path: string,
     handler: (
       context: Context<
-        ResponseSchema,
-        ParamsSchema,
-        QuerySchema,
-        HeadersSchema,
-        CookiesSchema,
-        BodySchema,
-        FormSchema,
-        FileSchema,
-        FilesSchema,
+        ResponseDefinition,
+        ParamsDefinition,
+        QueryDefinition,
+        HeadersDefinition,
+        CookiesDefinition,
+        BodyDefinition,
+        FormDefinition,
+        FileDefinition,
+        FilesDefinition,
         Deps
       >,
-    ) =>
-      | HandlerReturnType<ResponseSchema>
-      | Promise<HandlerReturnType<ResponseSchema>>,
-    options?: RouteOptions<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+    ) => HandlerReturnType<ResponseDefinition>,
+    options?: RouteConfig<
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >,
   ) {
     this.registerRoute<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >('head', path, handler, options)
   }
 
   trace<
-    ResponseSchema extends ResponseSchemaMap | ZodType | undefined = undefined,
-    ParamsSchema extends ZodObject | undefined = undefined,
-    QuerySchema extends ZodObject | undefined = undefined,
-    HeadersSchema extends ZodObject | undefined = undefined,
-    CookiesSchema extends ZodObject | undefined = undefined,
-    BodySchema extends ZodType | undefined = undefined,
-    FormSchema extends ZodObject | undefined = undefined,
-    FileSchema extends ZodFile | undefined = undefined,
-    FilesSchema extends ZodArray<ZodFile> | undefined = undefined,
+    ResponseDefinition extends ResponseSpec = undefined,
+    ParamsDefinition extends ZodObject | undefined = undefined,
+    QueryDefinition extends ZodObject | undefined = undefined,
+    HeadersDefinition extends ZodObject | undefined = undefined,
+    CookiesDefinition extends ZodObject | undefined = undefined,
+    BodyDefinition extends ZodType | undefined = undefined,
+    FormDefinition extends ZodObject | undefined = undefined,
+    FileDefinition extends ZodFile | undefined = undefined,
+    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
     Deps extends Record<string, Provider<unknown>> | undefined = undefined,
   >(
     path: string,
     handler: (
       context: Context<
-        ResponseSchema,
-        ParamsSchema,
-        QuerySchema,
-        HeadersSchema,
-        CookiesSchema,
-        BodySchema,
-        FormSchema,
-        FileSchema,
-        FilesSchema,
+        ResponseDefinition,
+        ParamsDefinition,
+        QueryDefinition,
+        HeadersDefinition,
+        CookiesDefinition,
+        BodyDefinition,
+        FormDefinition,
+        FileDefinition,
+        FilesDefinition,
         Deps
       >,
-    ) =>
-      | HandlerReturnType<ResponseSchema>
-      | Promise<HandlerReturnType<ResponseSchema>>,
-    options?: RouteOptions<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+    ) => HandlerReturnType<ResponseDefinition>,
+    options?: RouteConfig<
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >,
   ) {
     this.registerRoute<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >('trace', path, handler, options)
   }

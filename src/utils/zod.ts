@@ -1,5 +1,5 @@
 import type { ZodType } from 'zod'
 
-export function isZodType(value: unknown): value is ZodType {
-  return typeof value === 'object' && value !== null && '_zod' in value
+export function isZodType(obj: unknown): obj is ZodType {
+  return typeof obj === 'object' && obj !== null && '_zod' in obj
 }

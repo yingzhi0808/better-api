@@ -1,5 +1,8 @@
 import type { StatusCode } from 'hono/utils/http-status'
-import type { StatusOrInit } from '@/hono/api'
+
+export type StatusOrInit<Status extends StatusCode> =
+  | Status
+  | (ResponseInit & { status?: Status })
 
 export class JsonResponse<
   const Body,

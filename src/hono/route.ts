@@ -1,39 +1,32 @@
 import type z from 'zod'
 import type { ZodObject } from 'zod'
 import type { Provider } from '@/core/di'
-import type {
-  HandlerReturnType,
-  ResponseSchemaMap,
-  RouteOptions,
-} from '@/hono/api'
+import type { HandlerReturnType, ResponseSpec, RouteConfig } from '@/hono/api'
 import type { HttpMethod } from '@/types/common'
 import type { Context as BetterContext } from '../core/context'
 
 export function route<
-  ResponseSchema extends
-    | ResponseSchemaMap
-    | z.ZodTypeAny
-    | undefined = undefined,
-  ParamsSchema extends ZodObject | undefined = undefined,
-  QuerySchema extends ZodObject | undefined = undefined,
-  HeadersSchema extends ZodObject | undefined = undefined,
-  CookiesSchema extends ZodObject | undefined = undefined,
-  BodySchema extends z.ZodTypeAny | undefined = undefined,
-  FormSchema extends z.ZodTypeAny | undefined = undefined,
-  FileSchema extends z.ZodTypeAny | undefined = undefined,
-  FilesSchema extends z.ZodTypeAny | undefined = undefined,
+  ResponseDefinition extends ResponseSpec = undefined,
+  ParamsDefinition extends ZodObject | undefined = undefined,
+  QueryDefinition extends ZodObject | undefined = undefined,
+  HeadersDefinition extends ZodObject | undefined = undefined,
+  CookiesDefinition extends ZodObject | undefined = undefined,
+  BodyDefinition extends z.ZodTypeAny | undefined = undefined,
+  FormDefinition extends z.ZodTypeAny | undefined = undefined,
+  FileDefinition extends z.ZodTypeAny | undefined = undefined,
+  FilesDefinition extends z.ZodTypeAny | undefined = undefined,
   Deps extends Record<string, Provider<unknown>> | undefined = undefined,
 >(
-  def: RouteOptions<
-    ResponseSchema,
-    ParamsSchema,
-    QuerySchema,
-    HeadersSchema,
-    CookiesSchema,
-    BodySchema,
-    FormSchema,
-    FileSchema,
-    FilesSchema,
+  def: RouteConfig<
+    ResponseDefinition,
+    ParamsDefinition,
+    QueryDefinition,
+    HeadersDefinition,
+    CookiesDefinition,
+    BodyDefinition,
+    FormDefinition,
+    FileDefinition,
+    FilesDefinition,
     Deps
   >,
 ) {
@@ -41,77 +34,71 @@ export function route<
 }
 
 export type RouteDefinition<
-  ResponseSchema extends
-    | ResponseSchemaMap
-    | z.ZodTypeAny
-    | undefined = undefined,
-  ParamsSchema extends ZodObject | undefined = undefined,
-  QuerySchema extends ZodObject | undefined = undefined,
-  HeadersSchema extends ZodObject | undefined = undefined,
-  CookiesSchema extends ZodObject | undefined = undefined,
-  BodySchema extends z.ZodTypeAny | undefined = undefined,
-  FormSchema extends z.ZodTypeAny | undefined = undefined,
-  FileSchema extends z.ZodTypeAny | undefined = undefined,
-  FilesSchema extends z.ZodTypeAny | undefined = undefined,
+  ResponseDefinition extends ResponseSpec = undefined,
+  ParamsDefinition extends ZodObject | undefined = undefined,
+  QueryDefinition extends ZodObject | undefined = undefined,
+  HeadersDefinition extends ZodObject | undefined = undefined,
+  CookiesDefinition extends ZodObject | undefined = undefined,
+  BodyDefinition extends z.ZodTypeAny | undefined = undefined,
+  FormDefinition extends z.ZodTypeAny | undefined = undefined,
+  FileDefinition extends z.ZodTypeAny | undefined = undefined,
+  FilesDefinition extends z.ZodTypeAny | undefined = undefined,
   Deps extends Record<string, Provider<unknown>> | undefined = undefined,
 > = {
   method: HttpMethod
   path: string
   handler: (
     ctx: BetterContext<
-      ResponseSchema,
-      ParamsSchema,
-      QuerySchema,
-      HeadersSchema,
-      CookiesSchema,
-      BodySchema,
-      FormSchema,
-      FileSchema,
-      FilesSchema,
+      ResponseDefinition,
+      ParamsDefinition,
+      QueryDefinition,
+      HeadersDefinition,
+      CookiesDefinition,
+      BodyDefinition,
+      FormDefinition,
+      FileDefinition,
+      FilesDefinition,
       Deps
     >,
   ) =>
-    | HandlerReturnType<ResponseSchema>
-    | Promise<HandlerReturnType<ResponseSchema>>
-  schema?: RouteOptions<
-    ResponseSchema,
-    ParamsSchema,
-    QuerySchema,
-    HeadersSchema,
-    CookiesSchema,
-    BodySchema,
-    FormSchema,
-    FileSchema,
-    FilesSchema,
+    | HandlerReturnType<ResponseDefinition>
+    | Promise<HandlerReturnType<ResponseDefinition>>
+  schema?: RouteConfig<
+    ResponseDefinition,
+    ParamsDefinition,
+    QueryDefinition,
+    HeadersDefinition,
+    CookiesDefinition,
+    BodyDefinition,
+    FormDefinition,
+    FileDefinition,
+    FilesDefinition,
     Deps
   >
 }
 
 export function defineRoute<
-  ResponseSchema extends
-    | ResponseSchemaMap
-    | z.ZodTypeAny
-    | undefined = undefined,
-  ParamsSchema extends ZodObject | undefined = undefined,
-  QuerySchema extends ZodObject | undefined = undefined,
-  HeadersSchema extends ZodObject | undefined = undefined,
-  CookiesSchema extends ZodObject | undefined = undefined,
-  BodySchema extends z.ZodTypeAny | undefined = undefined,
-  FormSchema extends z.ZodTypeAny | undefined = undefined,
-  FileSchema extends z.ZodTypeAny | undefined = undefined,
-  FilesSchema extends z.ZodTypeAny | undefined = undefined,
+  ResponseDefinition extends ResponseSpec = undefined,
+  ParamsDefinition extends ZodObject | undefined = undefined,
+  QueryDefinition extends ZodObject | undefined = undefined,
+  HeadersDefinition extends ZodObject | undefined = undefined,
+  CookiesDefinition extends ZodObject | undefined = undefined,
+  BodyDefinition extends z.ZodTypeAny | undefined = undefined,
+  FormDefinition extends z.ZodTypeAny | undefined = undefined,
+  FileDefinition extends z.ZodTypeAny | undefined = undefined,
+  FilesDefinition extends z.ZodTypeAny | undefined = undefined,
   Deps extends Record<string, Provider<unknown>> | undefined = undefined,
 >(
   def: RouteDefinition<
-    ResponseSchema,
-    ParamsSchema,
-    QuerySchema,
-    HeadersSchema,
-    CookiesSchema,
-    BodySchema,
-    FormSchema,
-    FileSchema,
-    FilesSchema,
+    ResponseDefinition,
+    ParamsDefinition,
+    QueryDefinition,
+    HeadersDefinition,
+    CookiesDefinition,
+    BodyDefinition,
+    FormDefinition,
+    FileDefinition,
+    FilesDefinition,
     Deps
   >,
 ) {
