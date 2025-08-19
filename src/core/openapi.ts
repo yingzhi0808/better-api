@@ -7,17 +7,17 @@ import z, {
   type ZodObject,
   type ZodType,
 } from 'zod'
+import type { StatusResponseMap } from '@/hono/api'
 import type { HttpMethod, ParameterIn } from '@/types/common'
 import type {
   ExampleObject,
-  HeaderObject,
   InfoObject,
-  MediaTypeObject,
   OperationObject,
   ParameterObject,
   PathsObject,
   ReferenceObject,
   RequestBodyObject,
+  ResponseObject,
   ResponsesObject,
   SchemaObject,
   SecurityRequirementObject,
@@ -25,22 +25,17 @@ import type {
   ServerObject,
   TagObject,
 } from '@/types/openapi'
-import type {
-  SimplifiedZodResponseObject,
-  ZodHeaderObject,
-  ZodResponseObject,
-} from '@/types/zod'
-import { isZodResponseObject } from '@/utils/response'
+import type { ZodHeaderObject, ZodResponseObject } from '@/types/zod'
+import { convertResponseSchema } from '@/utils/response'
 
-// 辅助函数：处理headers中的zod schema
-function processHeaders(
+function buildHeaders(
   headers?: Record<string, ZodHeaderObject | ReferenceObject>,
-): Record<string, HeaderObject | ReferenceObject> | undefined {
+) {
   if (!headers) {
     return undefined
   }
 
-  const processedHeaders: Record<string, HeaderObject | ReferenceObject> = {}
+  const processedHeaders: ResponseObject['headers'] = {}
 
   for (const [headerName, headerConfig] of Object.entries(headers)) {
     if (
@@ -48,16 +43,11 @@ function processHeaders(
       typeof headerConfig === 'object' &&
       '$ref' in headerConfig
     ) {
-      // 这是一个ReferenceObject，直接使用
       processedHeaders[headerName] = headerConfig
-    } else if (headerConfig && typeof headerConfig === 'object') {
-      // 这是一个ZodHeaderObject，需要处理schema
-      const zodHeader = headerConfig as ZodHeaderObject
+    } else {
       processedHeaders[headerName] = {
-        ...zodHeader,
-        schema: zodHeader.schema
-          ? (toJSONSchema(zodHeader.schema) as SchemaObject)
-          : undefined,
+        ...headerConfig,
+        schema: toJSONSchema(headerConfig.schema) as SchemaObject,
       }
     }
   }
@@ -65,17 +55,10 @@ function processHeaders(
   return Object.keys(processedHeaders).length > 0 ? processedHeaders : undefined
 }
 
-// 为了向后兼容，保留一个带contentType的扩展类型
-interface ResponseConfigForOpenAPI extends SimplifiedZodResponseObject {
-  contentType?: string
-}
-
 interface RouteSchema {
   path: string
   method: string
-  response?: Partial<
-    Record<StatusCode, ZodType | ResponseConfigForOpenAPI | ZodResponseObject>
-  >
+  response?: Partial<Record<StatusCode, ZodResponseObject>>
   params?: ZodObject
   query?: ZodObject
   headers?: ZodObject
@@ -103,7 +86,7 @@ let metaServers: ServerObject[] | undefined
 let metaTags: TagObject[] | undefined
 let globalSecurity: SecurityRequirementObject[] | undefined
 let securitySchemes: Record<string, SecuritySchemeObject> | undefined
-const globalDefaultResponses: Partial<Record<string, ZodType>> = {}
+let globalResponses: StatusResponseMap = {}
 
 export function configureOpenAPI(options: {
   info?: Partial<InfoObject>
@@ -125,137 +108,33 @@ export function setGlobalSecurity(security: SecurityRequirementObject[]) {
   globalSecurity = security
 }
 
-export function addGlobalResponse(statusCode: string, zodSchema: ZodType) {
-  globalDefaultResponses[statusCode] = zodSchema
-}
-
-// 辅助函数：判断是否为ResponseConfigForOpenAPI
-function isResponseConfigForOpenAPI(
-  obj: unknown,
-): obj is ResponseConfigForOpenAPI {
-  return (
-    obj !== null &&
-    typeof obj === 'object' &&
-    'description' in obj &&
-    'schema' in obj &&
-    !('content' in obj)
-  )
+export function setGlobalResponses(responses: StatusResponseMap) {
+  globalResponses = responses
 }
 
 export function buildResponses(
-  schema: Partial<
-    Record<StatusCode, ZodType | ResponseConfigForOpenAPI | ZodResponseObject>
-  >,
-  defaultContentType = 'application/json',
+  schema: Partial<Record<StatusCode, ZodResponseObject>>,
 ) {
   const responses: ResponsesObject = {}
 
   for (const [statusCode, responseConfig] of Object.entries(schema)) {
-    if (isZodResponseObject(responseConfig)) {
-      // 情况1: 完整的ResponseConfigWithContent，支持所有OpenAPI字段
-      const content: Record<string, MediaTypeObject> = {}
-      for (const [mediaType, mediaConfig] of Object.entries(
-        responseConfig.content,
-      )) {
-        const jsonSchema = toJSONSchema(mediaConfig.schema) as SchemaObject
-        content[mediaType] = {
-          schema: jsonSchema,
-          // 保留MediaTypeObject的其他字段
-          example: mediaConfig.example,
-          examples: mediaConfig.examples,
-          encoding: mediaConfig.encoding,
-          // 扩展字段
-          ...Object.fromEntries(
-            Object.entries(mediaConfig).filter(([key]) => key.startsWith('x-')),
-          ),
-        }
+    const content: ResponseObject['content'] = {}
+    for (const [mediaType, mediaConfig] of Object.entries(
+      responseConfig.content,
+    )) {
+      const jsonSchema = toJSONSchema(mediaConfig.schema) as SchemaObject
+      content[mediaType] = {
+        ...mediaConfig,
+        schema: jsonSchema,
       }
+    }
 
-      responses[statusCode] = {
-        description:
-          responseConfig.description || http.STATUS_CODES[statusCode] || '',
-        content,
-        // 保留ResponseObject的其他字段，处理headers中的zod schema
-        headers: processHeaders(responseConfig.headers),
-        links: responseConfig.links,
-        // 扩展字段
-        ...Object.fromEntries(
-          Object.entries(responseConfig).filter(([key]) =>
-            key.startsWith('x-'),
-          ),
-        ),
-      }
-    } else if (isResponseConfigForOpenAPI(responseConfig)) {
-      // 情况2: ResponseConfig，包含MediaTypeObject的字段
-      const jsonSchema = toJSONSchema(responseConfig.schema) as SchemaObject
-      const contentType = responseConfig.contentType || defaultContentType
-
-      responses[statusCode] = {
-        description:
-          responseConfig.description || http.STATUS_CODES[statusCode] || '',
-        content: {
-          [contentType]: {
-            schema: jsonSchema,
-            // 包含MediaTypeObject的其他字段
-            example: responseConfig.example,
-            examples: responseConfig.examples,
-            encoding: responseConfig.encoding,
-          },
-        },
-        // 保留ResponseObject的其他字段，处理headers中的zod schema
-        headers: processHeaders(
-          responseConfig.headers as Record<
-            string,
-            ZodHeaderObject | ReferenceObject
-          >,
-        ),
-        links: responseConfig.links,
-        // 扩展字段
-        ...Object.fromEntries(
-          Object.entries(responseConfig).filter(([key]) =>
-            key.startsWith('x-'),
-          ),
-        ),
-      }
-    } else if (
-      responseConfig &&
-      typeof responseConfig === 'object' &&
-      'schema' in responseConfig
-    ) {
-      // 这是从api.ts转换过来的ResponseConfig
-      const config = responseConfig as unknown as ResponseConfigForOpenAPI
-      const jsonSchema = toJSONSchema(config.schema) as SchemaObject
-      const contentType = config.contentType || defaultContentType
-
-      responses[statusCode] = {
-        description: config.description || http.STATUS_CODES[statusCode] || '',
-        content: {
-          [contentType]: {
-            schema: jsonSchema,
-            example: config.example,
-            examples: config.examples,
-            encoding: config.encoding,
-          },
-        },
-        headers: processHeaders(config.headers),
-        links: config.links,
-        ...Object.fromEntries(
-          Object.entries(config).filter(([key]) => key.startsWith('x-')),
-        ),
-      }
-    } else {
-      // 情况3: 直接的ZodType (向后兼容)
-      const jsonSchema = toJSONSchema(responseConfig) as SchemaObject
-      const description = http.STATUS_CODES[statusCode] || ''
-
-      responses[statusCode] = {
-        description,
-        content: {
-          [defaultContentType]: {
-            schema: jsonSchema,
-          },
-        },
-      }
+    responses[statusCode] = {
+      ...responseConfig,
+      description:
+        responseConfig.description || http.STATUS_CODES[statusCode] || '',
+      content,
+      headers: buildHeaders(responseConfig.headers),
     }
   }
 
@@ -377,9 +256,18 @@ export function generateOpenAPI() {
         files: route.files,
       })
 
-      const mergedResponses = {
-        ...globalDefaultResponses,
-        ...route.response,
+      let mergedResponses: Partial<Record<StatusCode, ZodResponseObject>> = {}
+
+      if (globalResponses) {
+        const convertedGlobalResponses = convertResponseSchema(globalResponses)
+        if (convertedGlobalResponses) {
+          mergedResponses = convertedGlobalResponses
+        }
+      }
+
+      // 再添加路由特定响应（会覆盖同状态码的全局响应）
+      if (route.response) {
+        mergedResponses = { ...mergedResponses, ...route.response }
       }
 
       const operation: OperationObject = {

@@ -1,5 +1,7 @@
 // 导入类型定义
-import type { StatusResponseMap } from '@/hono/api'
+
+import type { StatusCode } from 'hono/utils/http-status'
+import type { ResponseSpec, StatusResponseMap } from '@/hono/api'
 import type {
   SimplifiedZodResponseObject,
   ZodResponseObject,
@@ -30,4 +32,58 @@ export function isStatusResponseMap(obj: unknown): obj is StatusResponseMap {
       isSimplifiedZodResponseObject(val) ||
       isZodResponseObject(val),
   )
+}
+
+// 转换响应配置为统一的ZodResponseObject格式
+export function convertResponseSchema(response: ResponseSpec) {
+  if (!response) {
+    return undefined
+  }
+
+  if (isZodType(response)) {
+    return {
+      200: {
+        content: {
+          'application/json': {
+            schema: response,
+          },
+        },
+      },
+    }
+  }
+
+  if (isStatusResponseMap(response)) {
+    const result: Partial<Record<StatusCode, ZodResponseObject>> = {}
+    for (const [statusCode, config] of Object.entries(response)) {
+      const status = Number(statusCode) as StatusCode
+
+      if (isZodType(config)) {
+        result[status] = {
+          content: {
+            'application/json': {
+              schema: config,
+            },
+          },
+        }
+      } else if (isSimplifiedZodResponseObject(config)) {
+        const { schema, links, description, headers, ...rest } = config
+        result[status] = {
+          links,
+          description,
+          headers,
+          content: {
+            'application/json': {
+              schema,
+              ...rest,
+            },
+          },
+        }
+      } else if (isZodResponseObject(config)) {
+        result[status] = config
+      }
+    }
+    return result
+  }
+
+  return undefined
 }

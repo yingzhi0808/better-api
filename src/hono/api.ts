@@ -31,73 +31,20 @@ import type {
   SimplifiedZodResponseObject,
   ZodResponseObject,
 } from '@/types/zod'
-import {
-  isSimplifiedZodResponseObject,
-  isStatusResponseMap,
-  isZodResponseObject,
-} from '@/utils/response'
-import { isZodType } from '@/utils/zod'
+import { convertResponseSchema } from '@/utils/response'
 
-// 转换响应配置为OpenAPI兼容格式
-function convertResponseSchema(response: ResponseSpec) {
-  if (!response) {
-    return undefined
+// 获取用于校验的schema，基于统一的ZodResponseObject格式
+function getValidationSchema(
+  convertedResponse: Partial<Record<StatusCode, ZodResponseObject>>,
+  statusCode: StatusCode,
+) {
+  const responseConfig = convertedResponse[statusCode]
+  if (!responseConfig) {
+    return null
   }
 
-  // 情况1: 直接的ZodType
-  if (isZodType(response)) {
-    return { 200: response }
-  }
-
-  // 情况2: StatusResponseMap (包含ZodType、ResponseConfig或ResponseConfigWithContent)
-  if (isStatusResponseMap(response)) {
-    const result: Record<string, unknown> = {}
-    for (const [statusCode, config] of Object.entries(response)) {
-      if (isZodType(config)) {
-        // 原ResponseSchemaMap的情况：直接的ZodType
-        result[statusCode] = config
-      } else if (isSimplifiedZodResponseObject(config)) {
-        // { description, schema } -> 默认为JSON，保留所有其他字段
-        result[statusCode] = {
-          ...config,
-          contentType: 'application/json',
-        }
-      } else if (isZodResponseObject(config)) {
-        // { description, content } -> 保持原有结构
-        result[statusCode] = config
-      }
-    }
-    return result
-  }
-
-  return response
-}
-
-// 获取用于校验的schema
-function getValidationSchema(response: ResponseSpec, statusCode: StatusCode) {
-  if (isZodType(response)) {
-    return response
-  }
-
-  if (isStatusResponseMap(response)) {
-    const config = response[statusCode]
-    if (!config) {
-      return null
-    }
-
-    if (isZodType(config)) {
-      return config
-    }
-    if (isSimplifiedZodResponseObject(config)) {
-      return config.schema
-    }
-    if (isZodResponseObject(config)) {
-      const jsonContent = config.content['application/json']
-      return jsonContent.schema
-    }
-  }
-
-  return null
+  const jsonContent = responseConfig.content['application/json']
+  return jsonContent.schema
 }
 
 // 统一的ResponseConfigMap类型，支持三种值类型：
@@ -318,7 +265,7 @@ export class BetterAPI {
       }
     }
 
-    // 转换响应配置为OpenAPI兼容格式
+    // 转换响应配置为统一的ZodResponseObject格式
     const convertedResponse = convertResponseSchema(options?.response)
 
     addRouteSchema({
@@ -500,8 +447,7 @@ export class BetterAPI {
 
         const result = await handler(context)
 
-        if (options?.response) {
-          // 只对JSON响应进行校验
+        if (convertedResponse) {
           const shouldValidate =
             result instanceof JsonResponse || !(result instanceof Response)
 
@@ -515,9 +461,8 @@ export class BetterAPI {
                 ? (result.status as StatusCode)
                 : 200
 
-            // 获取用于校验的schema
             const validationSchema = getValidationSchema(
-              options.response,
+              convertedResponse,
               statusCode,
             )
 
