@@ -22,10 +22,10 @@ export function isZodResponseObject(obj: unknown): obj is ZodResponseObject {
 
 // 辅助函数：判断是否为ResponseConfigMap
 export function isStatusResponseMap(obj: unknown): obj is StatusResponseMap {
-  if (!obj || typeof obj !== 'object') {
+  if (obj === null || typeof obj !== 'object') {
     return false
   }
-  // ResponseConfigMap现在可以包含ZodType、ZodResponseConfig或ZodResponseObject
+
   return Object.values(obj).some(
     (val) =>
       isZodType(val) ||
@@ -35,11 +35,12 @@ export function isStatusResponseMap(obj: unknown): obj is StatusResponseMap {
 }
 
 // 转换响应配置为统一的ZodResponseObject格式
-export function convertResponseSchema(response: ResponseSpec) {
+export function convertResponseSchema(response?: ResponseSpec) {
   if (!response) {
     return undefined
   }
 
+  // 情况1: 直接的ZodType -> 转换为200状态码
   if (isZodType(response)) {
     return {
       200: {
@@ -52,6 +53,32 @@ export function convertResponseSchema(response: ResponseSpec) {
     }
   }
 
+  // 情况2: SimplifiedZodResponseObject -> 转换为200状态码
+  if (isSimplifiedZodResponseObject(response)) {
+    const { schema, links, description, headers, ...rest } = response
+    return {
+      200: {
+        links,
+        description,
+        headers,
+        content: {
+          'application/json': {
+            schema,
+            ...rest,
+          },
+        },
+      },
+    }
+  }
+
+  // 情况3: ZodResponseObject -> 转换为200状态码
+  if (isZodResponseObject(response)) {
+    return {
+      200: response,
+    }
+  }
+
+  // 情况4: StatusResponseMap -> 转换每个状态码
   if (isStatusResponseMap(response)) {
     const result: Partial<Record<StatusCode, ZodResponseObject>> = {}
     for (const [statusCode, config] of Object.entries(response)) {

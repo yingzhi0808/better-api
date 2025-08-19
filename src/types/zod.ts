@@ -77,16 +77,32 @@ export type InferResponse<ResponseDefinition, Status> =
       : never
     : ResponseDefinition extends ZodType
       ? z.input<ResponseDefinition>
-      : ResponseDefinition extends undefined
-        ? unknown
-        : never
+      : ResponseDefinition extends SimplifiedZodResponseObject
+        ? Status extends 200
+          ? z.input<ResponseDefinition['schema']>
+          : never
+        : ResponseDefinition extends ZodResponseObject
+          ? Status extends 200
+            ? ResponseDefinition['content']['application/json'] extends {
+                schema: infer S
+              }
+              ? S extends ZodType
+                ? z.input<S>
+                : never
+              : never
+            : never
+          : unknown
 
 // 统一的状态码推导工具，支持所有响应定义格式
 export type InferStatus<T> = T extends StatusResponseMap
   ? keyof T & StatusCode
   : T extends ZodType
     ? 200
-    : StatusCode
+    : T extends SimplifiedZodResponseObject
+      ? 200
+      : T extends ZodResponseObject
+        ? 200
+        : StatusCode
 
 // 推导所有可能的响应类型联合，用于 HandlerReturnType
 export type InferAllResponses<ResponseDefinition> =
@@ -108,6 +124,16 @@ export type InferAllResponses<ResponseDefinition> =
       }[keyof ResponseDefinition]
     : ResponseDefinition extends ZodType
       ? z.input<ResponseDefinition>
-      : ResponseDefinition extends undefined
-        ? unknown
-        : never
+      : ResponseDefinition extends SimplifiedZodResponseObject
+        ? z.input<ResponseDefinition['schema']>
+        : ResponseDefinition extends ZodResponseObject
+          ? ResponseDefinition['content']['application/json'] extends {
+              schema: infer S
+            }
+            ? S extends ZodType
+              ? z.input<S>
+              : never
+            : never
+          : ResponseDefinition extends undefined
+            ? unknown
+            : never

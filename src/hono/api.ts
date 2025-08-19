@@ -55,7 +55,11 @@ export type StatusResponseMap = Partial<
   Record<StatusCode, ZodType | SimplifiedZodResponseObject | ZodResponseObject>
 >
 
-export type ResponseSpec = StatusResponseMap | ZodType | undefined
+export type ResponseSpec =
+  | ZodType
+  | SimplifiedZodResponseObject
+  | ZodResponseObject
+  | StatusResponseMap
 
 export type HandlerReturnType<ResponseDefinition> =
   | InferAllResponses<ResponseDefinition>
@@ -119,7 +123,7 @@ export class BetterAPI {
 
   // 单个挂载
   mount<
-    ResponseDefinition extends ResponseSpec = undefined,
+    ResponseDefinition extends ResponseSpec,
     ParamsDefinition extends ZodObject | undefined = undefined,
     QueryDefinition extends ZodObject | undefined = undefined,
     HeadersDefinition extends ZodObject | undefined = undefined,
@@ -203,7 +207,7 @@ export class BetterAPI {
   }
 
   private registerRoute<
-    ResponseDefinition extends ResponseSpec = undefined,
+    ResponseDefinition extends ResponseSpec,
     ParamsDefinition extends ZodObject | undefined = undefined,
     QueryDefinition extends ZodObject | undefined = undefined,
     HeadersDefinition extends ZodObject | undefined = undefined,
@@ -511,7 +515,7 @@ export class BetterAPI {
   }
 
   post<
-    ResponseDefinition extends ResponseSpec = undefined,
+    ResponseDefinition extends ResponseSpec,
     ParamsDefinition extends ZodObject | undefined = undefined,
     QueryDefinition extends ZodObject | undefined = undefined,
     HeadersDefinition extends ZodObject | undefined = undefined,
@@ -565,7 +569,7 @@ export class BetterAPI {
   }
 
   get<
-    ResponseDefinition extends ResponseSpec = undefined,
+    ResponseDefinition extends ResponseSpec,
     ParamsDefinition extends ZodObject | undefined = undefined,
     QueryDefinition extends ZodObject | undefined = undefined,
     HeadersDefinition extends ZodObject | undefined = undefined,
@@ -619,7 +623,7 @@ export class BetterAPI {
   }
 
   put<
-    ResponseDefinition extends ResponseSpec = undefined,
+    ResponseDefinition extends ResponseSpec,
     ParamsDefinition extends ZodObject | undefined = undefined,
     QueryDefinition extends ZodObject | undefined = undefined,
     HeadersDefinition extends ZodObject | undefined = undefined,
@@ -673,7 +677,7 @@ export class BetterAPI {
   }
 
   delete<
-    ResponseDefinition extends ResponseSpec = undefined,
+    ResponseDefinition extends ResponseSpec,
     ParamsDefinition extends ZodObject | undefined = undefined,
     QueryDefinition extends ZodObject | undefined = undefined,
     HeadersDefinition extends ZodObject | undefined = undefined,
@@ -727,7 +731,7 @@ export class BetterAPI {
   }
 
   patch<
-    ResponseDefinition extends ResponseSpec = undefined,
+    ResponseDefinition extends ResponseSpec,
     ParamsDefinition extends ZodObject | undefined = undefined,
     QueryDefinition extends ZodObject | undefined = undefined,
     HeadersDefinition extends ZodObject | undefined = undefined,
@@ -781,7 +785,7 @@ export class BetterAPI {
   }
 
   options<
-    ResponseDefinition extends ResponseSpec = undefined,
+    ResponseDefinition extends ResponseSpec,
     ParamsDefinition extends ZodObject | undefined = undefined,
     QueryDefinition extends ZodObject | undefined = undefined,
     HeadersDefinition extends ZodObject | undefined = undefined,
@@ -835,7 +839,7 @@ export class BetterAPI {
   }
 
   head<
-    ResponseDefinition extends ResponseSpec = undefined,
+    ResponseDefinition extends ResponseSpec,
     ParamsDefinition extends ZodObject | undefined = undefined,
     QueryDefinition extends ZodObject | undefined = undefined,
     HeadersDefinition extends ZodObject | undefined = undefined,
@@ -889,7 +893,7 @@ export class BetterAPI {
   }
 
   trace<
-    ResponseDefinition extends ResponseSpec = undefined,
+    ResponseDefinition extends ResponseSpec,
     ParamsDefinition extends ZodObject | undefined = undefined,
     QueryDefinition extends ZodObject | undefined = undefined,
     HeadersDefinition extends ZodObject | undefined = undefined,
