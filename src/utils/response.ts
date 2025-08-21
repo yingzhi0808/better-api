@@ -1,5 +1,3 @@
-// 导入类型定义
-
 import type { StatusCode } from 'hono/utils/http-status'
 import type { ResponseSpec, StatusResponseMap } from '@/hono/api'
 import type {

@@ -84,7 +84,7 @@ export interface RouteConfig<
   FilesDefinition,
   Deps,
 > {
-  response?: ResponseDefinition
+  responses?: ResponseDefinition
   params?: ParamsDefinition
   query?: QueryDefinition
   headers?: HeadersDefinition
@@ -270,7 +270,7 @@ export class BetterAPI {
     }
 
     // 转换响应配置为统一的ZodResponseObject格式
-    const convertedResponse = convertResponseSchema(options?.response)
+    const convertedResponse = convertResponseSchema(options?.responses)
 
     addRouteSchema({
       path,
