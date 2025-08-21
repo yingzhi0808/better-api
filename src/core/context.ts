@@ -20,7 +20,7 @@ import type { BetterApiResponses } from '@/types/response'
 import type { StatusOrInit } from './response'
 
 export class Context<
-  Response,
+  Responses,
   Params,
   Query,
   Headers,
@@ -45,27 +45,27 @@ export class Context<
   ) {}
 
   json<
-    Data extends InferResponse<Response, Status>,
+    Data extends InferResponse<Responses, Status>,
     const Status extends 200 = 200,
   >(data: Data): JsonResponse<Data, Status>
   json<
-    Data extends InferResponse<Response, Status>,
-    Status extends InferStatus<Response>,
+    Data extends InferResponse<Responses, Status>,
+    Status extends InferStatus<Responses>,
   >(data: Data, status: Status): JsonResponse<Data, Status>
   json<
-    Data extends InferResponse<Response, Status>,
-    Status extends InferStatus<Response>,
+    Data extends InferResponse<Responses, Status>,
+    Status extends InferStatus<Responses>,
   >(data: Data, status?: Status) {
     return new JsonResponse(data, status)
   }
 
   html<
     const Data extends string,
-    const Status extends Response extends BetterApiResponses
-      ? keyof Response & StatusCode
-      : Response extends ZodType
+    const Status extends Responses extends BetterApiResponses
+      ? keyof Responses & StatusCode
+      : Responses extends ZodType
         ? 200
-        : Response extends undefined
+        : Responses extends undefined
           ? StatusCode
           : never,
   >(data: Data, statusOrInit?: StatusOrInit<Status>) {
@@ -74,11 +74,11 @@ export class Context<
 
   text<
     const Data extends string,
-    const Status extends Response extends BetterApiResponses
-      ? keyof Response & StatusCode
-      : Response extends ZodType
+    const Status extends Responses extends BetterApiResponses
+      ? keyof Responses & StatusCode
+      : Responses extends ZodType
         ? 200
-        : Response extends undefined
+        : Responses extends undefined
           ? StatusCode
           : never,
   >(data: Data, statusOrInit?: StatusOrInit<Status>) {

@@ -1,6 +1,6 @@
-import type { Response } from '@/hono/api'
 import type {
   BetterApiResponses,
+  ResponsesDefinition,
   SimplifiedZodOpenApiResponseObject,
   ZodOpenApiResponseObject,
   ZodOpenApiResponsesObject,
@@ -37,7 +37,7 @@ export function isStatusResponseMap(obj: unknown): obj is BetterApiResponses {
 
 // 转换响应配置为统一的ZodResponseObject格式
 export function normalizeZodOpenApiResponses(
-  responses: Response,
+  responses: ResponsesDefinition,
 ): ZodOpenApiResponsesObject {
   // 情况1: 直接的ZodType -> 转换为200状态码
   if (isZodType(responses)) {

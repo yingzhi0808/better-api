@@ -14,7 +14,6 @@ import {
 } from '@/core/di'
 import { addRouteSchema } from '@/core/openapi'
 import { JsonResponse } from '@/core/response'
-import type { RouteDefinition } from '@/hono/route'
 import type { HttpMethod } from '@/types/common'
 import type {
   InferAllResponses,
@@ -28,16 +27,16 @@ import type {
   InferQuery,
 } from '@/types/infer'
 import type {
-  BetterApiResponse,
+  ResponsesDefinition,
   ZodOpenApiResponsesObject,
 } from '@/types/response'
 import { normalizeZodOpenApiResponses } from '@/utils/response'
 import { isZodType } from '@/utils/zod'
 
-export type HandlerReturnType<Response> =
-  | InferAllResponses<Response>
+export type HandlerReturnType<Responses> =
+  | InferAllResponses<Responses>
   | Response
-  | Promise<InferAllResponses<Response> | Response>
+  | Promise<InferAllResponses<Responses> | Response>
 
 export type Provided<
   Dependencies extends Record<string, Provider<unknown>> | undefined,
@@ -81,111 +80,13 @@ export class BetterAPI {
     return this.instance
   }
 
-  // 批量挂载
-  mountMany(defs: RouteDefinition[]) {
-    for (const d of defs) {
-      this.registerRoute(
-        d.method as HttpMethod,
-        d.path,
-        d.handler as never,
-        d.schema as never,
-      )
-    }
-  }
-
-  // 单个挂载
-  mount<
-    Response extends BetterApiResponse,
-    Params extends ZodObject | undefined = undefined,
-    Query extends ZodObject | undefined = undefined,
-    Headers extends ZodObject | undefined = undefined,
-    Cookies extends ZodObject | undefined = undefined,
-    Body extends ZodType | undefined = undefined,
-    Form extends ZodObject | undefined = undefined,
-    File extends ZodFile | undefined = undefined,
-    Files extends ZodArray<ZodFile> | undefined = undefined,
-    Dependencies extends
-      | Record<string, Provider<unknown>>
-      | undefined = undefined,
-  >(
-    def: RouteDefinition<
-      Response,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >,
-  ) {
-    this.registerRoute(
-      def.method as HttpMethod,
-      def.path,
-      def.handler as never,
-      def.schema as never,
-    )
-  }
-
-  // 路由分组
-  group(
-    prefix: string,
-    opts: { tags?: string[]; dependencies?: Record<string, Provider<unknown>> },
-    build: (g: BetterAPI) => void,
-  ) {
-    const sub = new BetterAPI()
-    const inst = sub.getInstance()
-    this.instance.route(prefix, inst)
-    // 仅将 tags 合并到子路由注册时使用（通过 schema.tags 默认值）
-    const origRegister: BetterAPI['registerRoute'] = (
-      sub as unknown as { registerRoute: BetterAPI['registerRoute'] }
-    ).registerRoute.bind(sub)
-    ;(
-      sub as unknown as { registerRoute: BetterAPI['registerRoute'] }
-    ).registerRoute = (method, path, handler, schema) => {
-      const merged: NonNullable<typeof schema> = {
-        ...(schema as object),
-      } as NonNullable<typeof schema>
-      if (opts?.tags?.length) {
-        ;(merged as { tags?: string[] }).tags = Array.from(
-          new Set([
-            ...(schema && (schema as { tags?: string[] }).tags
-              ? (schema as { tags?: string[] }).tags!
-              : []),
-            ...opts.tags,
-          ]),
-        )
-      }
-      if (opts?.dependencies) {
-        ;(
-          merged as { dependencies?: Record<string, Provider<unknown>> }
-        ).dependencies = {
-          ...(schema &&
-          (schema as { dependencies?: Record<string, Provider<unknown>> })
-            .dependencies
-            ? (schema as { dependencies?: Record<string, Provider<unknown>> })
-                .dependencies!
-            : {}),
-          ...opts.dependencies,
-        }
-      }
-      return origRegister(method, path, handler, merged)
-    }
-    build(sub)
-  }
-
-  // 中间件支持
   use(...args: Parameters<Hono['use']>) {
-    const u = this.instance.use.bind(this.instance) as (
-      ...as: Parameters<Hono['use']>
-    ) => unknown
+    const u = this.instance.use.bind(this.instance)
     u(...args)
   }
 
   private registerRoute<
-    Response extends BetterApiResponse,
+    Responses extends ResponsesDefinition,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
@@ -202,7 +103,7 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        Response,
+        Responses,
         Params,
         Query,
         Headers,
@@ -213,9 +114,9 @@ export class BetterAPI {
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Response>,
+    ) => HandlerReturnType<Responses>,
     options?: RouteConfig<
-      Response,
+      Responses,
       Params,
       Query,
       Headers,
@@ -227,7 +128,6 @@ export class BetterAPI {
       Dependencies
     >,
   ) {
-    // 转换响应配置为统一的ZodResponseObject格式
     const responses = normalizeZodOpenApiResponses(options?.responses ?? {})
 
     addRouteSchema({
@@ -473,7 +373,7 @@ export class BetterAPI {
   }
 
   post<
-    Response extends BetterApiResponse,
+    Responses extends ResponsesDefinition,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
@@ -489,7 +389,7 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        Response,
+        Responses,
         Params,
         Query,
         Headers,
@@ -500,9 +400,9 @@ export class BetterAPI {
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Response>,
+    ) => HandlerReturnType<Responses>,
     options?: RouteConfig<
-      Response,
+      Responses,
       Params,
       Query,
       Headers,
@@ -514,22 +414,11 @@ export class BetterAPI {
       Dependencies
     >,
   ) {
-    this.registerRoute<
-      Response,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >('post', path, handler, options)
+    this.registerRoute('post', path, handler, options)
   }
 
   get<
-    Response extends BetterApiResponse,
+    Responses extends ResponsesDefinition,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
@@ -545,7 +434,7 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        Response,
+        Responses,
         Params,
         Query,
         Headers,
@@ -556,9 +445,9 @@ export class BetterAPI {
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Response>,
+    ) => HandlerReturnType<Responses>,
     options?: RouteConfig<
-      Response,
+      Responses,
       Params,
       Query,
       Headers,
@@ -570,22 +459,11 @@ export class BetterAPI {
       Dependencies
     >,
   ) {
-    this.registerRoute<
-      Response,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >('get', path, handler, options)
+    this.registerRoute('get', path, handler, options)
   }
 
   put<
-    Response extends BetterApiResponse,
+    Responses extends ResponsesDefinition,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
@@ -601,7 +479,7 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        Response,
+        Responses,
         Params,
         Query,
         Headers,
@@ -612,9 +490,9 @@ export class BetterAPI {
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Response>,
+    ) => HandlerReturnType<Responses>,
     options?: RouteConfig<
-      Response,
+      Responses,
       Params,
       Query,
       Headers,
@@ -626,22 +504,11 @@ export class BetterAPI {
       Dependencies
     >,
   ) {
-    this.registerRoute<
-      Response,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >('put', path, handler, options)
+    this.registerRoute('put', path, handler, options)
   }
 
   delete<
-    Response extends BetterApiResponse,
+    Responses extends ResponsesDefinition,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
@@ -657,7 +524,7 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        Response,
+        Responses,
         Params,
         Query,
         Headers,
@@ -668,9 +535,9 @@ export class BetterAPI {
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Response>,
+    ) => HandlerReturnType<Responses>,
     options?: RouteConfig<
-      Response,
+      Responses,
       Params,
       Query,
       Headers,
@@ -682,22 +549,11 @@ export class BetterAPI {
       Dependencies
     >,
   ) {
-    this.registerRoute<
-      Response,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >('delete', path, handler, options)
+    this.registerRoute('delete', path, handler, options)
   }
 
   patch<
-    Response extends BetterApiResponse,
+    Responses extends ResponsesDefinition,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
@@ -713,7 +569,7 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        Response,
+        Responses,
         Params,
         Query,
         Headers,
@@ -724,9 +580,9 @@ export class BetterAPI {
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Response>,
+    ) => HandlerReturnType<Responses>,
     options?: RouteConfig<
-      Response,
+      Responses,
       Params,
       Query,
       Headers,
@@ -738,22 +594,11 @@ export class BetterAPI {
       Dependencies
     >,
   ) {
-    this.registerRoute<
-      Response,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >('patch', path, handler, options)
+    this.registerRoute('patch', path, handler, options)
   }
 
   options<
-    Response extends BetterApiResponse,
+    Responses extends ResponsesDefinition,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
@@ -769,7 +614,7 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        Response,
+        Responses,
         Params,
         Query,
         Headers,
@@ -780,9 +625,9 @@ export class BetterAPI {
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Response>,
+    ) => HandlerReturnType<Responses>,
     options?: RouteConfig<
-      Response,
+      Responses,
       Params,
       Query,
       Headers,
@@ -794,22 +639,11 @@ export class BetterAPI {
       Dependencies
     >,
   ) {
-    this.registerRoute<
-      Response,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >('options', path, handler, options)
+    this.registerRoute('options', path, handler, options)
   }
 
   head<
-    Response extends BetterApiResponse,
+    Responses extends ResponsesDefinition,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
@@ -825,7 +659,7 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        Response,
+        Responses,
         Params,
         Query,
         Headers,
@@ -836,9 +670,9 @@ export class BetterAPI {
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Response>,
+    ) => HandlerReturnType<Responses>,
     options?: RouteConfig<
-      Response,
+      Responses,
       Params,
       Query,
       Headers,
@@ -850,22 +684,11 @@ export class BetterAPI {
       Dependencies
     >,
   ) {
-    this.registerRoute<
-      Response,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >('head', path, handler, options)
+    this.registerRoute('head', path, handler, options)
   }
 
   trace<
-    Response extends BetterApiResponse,
+    Responses extends ResponsesDefinition,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
@@ -881,7 +704,7 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        Response,
+        Responses,
         Params,
         Query,
         Headers,
@@ -892,9 +715,9 @@ export class BetterAPI {
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Response>,
+    ) => HandlerReturnType<Responses>,
     options?: RouteConfig<
-      Response,
+      Responses,
       Params,
       Query,
       Headers,
@@ -906,18 +729,7 @@ export class BetterAPI {
       Dependencies
     >,
   ) {
-    this.registerRoute<
-      Response,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >('trace', path, handler, options)
+    this.registerRoute('trace', path, handler, options)
   }
 }
 
