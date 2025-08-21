@@ -1,11 +1,13 @@
 import http from 'node:http'
 import z, { type ZodArray, ZodFile, type ZodObject, type ZodType } from 'zod'
 import type {
+  BetterApiResponse,
   BetterApiResponses,
   ZodOpenApiResponsesObject,
 } from '@/types/response'
 import { normalizeZodOpenApiResponses } from '@/utils/response'
 import 'zod-openapi'
+import type { StatusCode } from 'hono/utils/http-status'
 import {
   type ZodOpenApiResponsesObject as _ZodOpenApiResponsesObject,
   createDocument,
@@ -43,7 +45,9 @@ export function registerOpenApiRoute(route: OpenApiRoute) {
 
 let globalResponses: BetterApiResponses = {}
 
-export function setGlobalResponses(responses: BetterApiResponses) {
+export function setGlobalResponses(
+  responses: Partial<Record<StatusCode, BetterApiResponse>>,
+) {
   globalResponses = responses
 }
 
