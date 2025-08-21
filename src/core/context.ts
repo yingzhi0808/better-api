@@ -28,7 +28,7 @@ export class Context<
   FormDefinition,
   FileDefinition,
   FilesDefinition,
-  Deps extends Record<string, Provider<unknown>> | undefined,
+  Dependencies extends Record<string, Provider<unknown>> | undefined,
 > {
   constructor(
     public readonly hono: HonoCtx,
@@ -40,7 +40,7 @@ export class Context<
     public readonly form: InferForm<FormDefinition>,
     public readonly file: InferFile<FileDefinition>,
     public readonly files: InferFiles<FilesDefinition>,
-    public readonly deps: Provided<Deps>,
+    public readonly dependencies: Provided<Dependencies>,
   ) {}
 
   json<

@@ -15,7 +15,9 @@ export function route<
   FormDefinition extends z.ZodTypeAny | undefined = undefined,
   FileDefinition extends z.ZodTypeAny | undefined = undefined,
   FilesDefinition extends z.ZodTypeAny | undefined = undefined,
-  Deps extends Record<string, Provider<unknown>> | undefined = undefined,
+  Dependencies extends
+    | Record<string, Provider<unknown>>
+    | undefined = undefined,
 >(
   def: RouteConfig<
     ResponseDefinition,
@@ -27,7 +29,7 @@ export function route<
     FormDefinition,
     FileDefinition,
     FilesDefinition,
-    Deps
+    Dependencies
   >,
 ) {
   return def
@@ -43,7 +45,9 @@ export type RouteDefinition<
   FormDefinition extends z.ZodTypeAny | undefined = undefined,
   FileDefinition extends z.ZodTypeAny | undefined = undefined,
   FilesDefinition extends z.ZodTypeAny | undefined = undefined,
-  Deps extends Record<string, Provider<unknown>> | undefined = undefined,
+  Dependencies extends
+    | Record<string, Provider<unknown>>
+    | undefined = undefined,
 > = {
   method: HttpMethod
   path: string
@@ -58,7 +62,7 @@ export type RouteDefinition<
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >,
   ) =>
     | HandlerReturnType<ResponseDefinition>
@@ -73,7 +77,7 @@ export type RouteDefinition<
     FormDefinition,
     FileDefinition,
     FilesDefinition,
-    Deps
+    Dependencies
   >
 }
 
@@ -87,7 +91,9 @@ export function defineRoute<
   FormDefinition extends z.ZodTypeAny | undefined = undefined,
   FileDefinition extends z.ZodTypeAny | undefined = undefined,
   FilesDefinition extends z.ZodTypeAny | undefined = undefined,
-  Deps extends Record<string, Provider<unknown>> | undefined = undefined,
+  Dependencies extends
+    | Record<string, Provider<unknown>>
+    | undefined = undefined,
 >(
   def: RouteDefinition<
     ResponseDefinition,
@@ -99,7 +105,7 @@ export function defineRoute<
     FormDefinition,
     FileDefinition,
     FilesDefinition,
-    Deps
+    Dependencies
   >,
 ) {
   return def

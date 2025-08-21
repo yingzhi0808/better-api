@@ -9,7 +9,7 @@
 
 - 路由注册与强类型上下文
   - `app.get/post/put/delete/patch/options/head/trace(path, handler, schema?)`
-  - `Context` 提供 `params/query/headers/cookies/body/deps/after/sse`
+  - `Context` 提供 `params/query/headers/cookies/body/dependencies/after/sse`
   - 运行时校验：`params/query/headers/cookies/body` 传入 Zod Schema 自动校验
   - 响应校验：`response` 可为单一 schema 或 `{ 200: zod, 400: zod }`
 
@@ -24,7 +24,7 @@
 - DI/Depends 与鉴权
   - `dep(fn)` 声明 Provider；请求级缓存；可互相依赖
   - `requiresAuth(scheme, provider, scopes?)` 与 `bearerAuth(provider, scopes?)`
-  - 从 `deps` 自动推导 OpenAPI `security`（或手动传 `schema.security`）
+  - 从 `dependencies` 自动推导 OpenAPI `security`（或手动传 `schema.security`）
 
 - SSE/WS
   - `app.sse(path, handler)` + `Context.sse({ retry? })` 返回 `text/event-stream`
@@ -35,7 +35,7 @@
 
 - DX 辅助
   - `defineRoute({ method, path, handler, schema })` + `app.mount(def)`/`app.mountMany(defs)`
-  - `group('/prefix', { tags, deps }, g => { g.get(...); g.mountMany([...]) })`
+  - `group('/prefix', { tags, dependencies }, g => { g.get(...); g.mountMany([...]) })`
 
 ## 目录结构
 
@@ -115,13 +115,13 @@ const baseUser = dep(async ({ hono }) => {
 const currentUser = bearerAuth(baseUser, ['articles:write'])
 
 app.post('/articles/:id', async (c) => {
-  const me = await c.deps!.currentUser
+  const me = await c.dependencies!.currentUser
   c.after(() => {/* 审计日志 */})
   return c.json({ id: c.params.id, me, body: c.body }, 201)
 }, {
   params: z.object({ id: z.string() }),
   body: z.object({ title: z.string(), content: z.string().min(1) }),
-  deps: { currentUser },
+  dependencies: { currentUser },
   response: z.object({ id: z.string(), me: z.any(), body: z.any() })
 })
 ```

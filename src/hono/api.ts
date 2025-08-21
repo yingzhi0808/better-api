@@ -67,9 +67,9 @@ export type HandlerReturnType<ResponseDefinition> =
   | Promise<InferAllResponses<ResponseDefinition> | Response>
 
 export type Provided<
-  Deps extends Record<string, Provider<unknown>> | undefined,
-> = Deps extends Record<string, Provider<unknown>>
-  ? { [K in keyof Deps]: Promise<Awaited<ReturnType<Deps[K]>>> }
+  Dependencies extends Record<string, Provider<unknown>> | undefined,
+> = Dependencies extends Record<string, Provider<unknown>>
+  ? { [K in keyof Dependencies]: Promise<Awaited<ReturnType<Dependencies[K]>>> }
   : undefined
 
 export interface RouteConfig<
@@ -82,7 +82,7 @@ export interface RouteConfig<
   FormDefinition,
   FileDefinition,
   FilesDefinition,
-  Deps,
+  Dependencies,
 > {
   responses?: ResponseDefinition
   params?: ParamsDefinition
@@ -93,7 +93,7 @@ export interface RouteConfig<
   form?: FormDefinition
   file?: FileDefinition
   files?: FilesDefinition
-  deps?: Deps
+  dependencies?: Dependencies
   summary?: string
   description?: string
   tags?: string[]
@@ -132,7 +132,9 @@ export class BetterAPI {
     FormDefinition extends ZodObject | undefined = undefined,
     FileDefinition extends ZodFile | undefined = undefined,
     FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
-    Deps extends Record<string, Provider<unknown>> | undefined = undefined,
+    Dependencies extends
+      | Record<string, Provider<unknown>>
+      | undefined = undefined,
   >(
     def: RouteDefinition<
       ResponseDefinition,
@@ -144,7 +146,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >,
   ) {
     this.registerRoute(
@@ -158,7 +160,7 @@ export class BetterAPI {
   // 路由分组
   group(
     prefix: string,
-    opts: { tags?: string[]; deps?: Record<string, Provider<unknown>> },
+    opts: { tags?: string[]; dependencies?: Record<string, Provider<unknown>> },
     build: (g: BetterAPI) => void,
   ) {
     const sub = new BetterAPI()
@@ -184,13 +186,17 @@ export class BetterAPI {
           ]),
         )
       }
-      if (opts?.deps) {
-        ;(merged as { deps?: Record<string, Provider<unknown>> }).deps = {
+      if (opts?.dependencies) {
+        ;(
+          merged as { dependencies?: Record<string, Provider<unknown>> }
+        ).dependencies = {
           ...(schema &&
-          (schema as { deps?: Record<string, Provider<unknown>> }).deps
-            ? (schema as { deps?: Record<string, Provider<unknown>> }).deps!
+          (schema as { dependencies?: Record<string, Provider<unknown>> })
+            .dependencies
+            ? (schema as { dependencies?: Record<string, Provider<unknown>> })
+                .dependencies!
             : {}),
-          ...opts.deps,
+          ...opts.dependencies,
         }
       }
       return origRegister(method, path, handler, merged)
@@ -216,7 +222,9 @@ export class BetterAPI {
     FormDefinition extends ZodObject | undefined = undefined,
     FileDefinition extends ZodFile | undefined = undefined,
     FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
-    Deps extends Record<string, Provider<unknown>> | undefined = undefined,
+    Dependencies extends
+      | Record<string, Provider<unknown>>
+      | undefined = undefined,
   >(
     method: HttpMethod,
     path: string,
@@ -231,7 +239,7 @@ export class BetterAPI {
         FormDefinition,
         FileDefinition,
         FilesDefinition,
-        Deps
+        Dependencies
       >,
     ) => HandlerReturnType<ResponseDefinition>,
     options?: RouteConfig<
@@ -244,15 +252,15 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >,
   ) {
-    // auto derive security from deps
+    // auto derive security from dependencies
     let derivedSecurity: SecurityRequirementObject[] | undefined
-    if (options?.deps) {
+    if (options?.dependencies) {
       const reqs: SecurityRequirementObject[] = []
       for (const [, prov] of Object.entries(
-        options.deps as Record<string, Provider<unknown>>,
+        options.dependencies as Record<string, Provider<unknown>>,
       )) {
         const meta = (
           prov as unknown as Record<
@@ -408,9 +416,10 @@ export class BetterAPI {
           typedFiles = data
         }
 
-        // deps
-        let depsObject: Provided<Deps> = undefined as Provided<Deps>
-        if (options?.deps) {
+        // dependencies
+        let depsObject: Provided<Dependencies> =
+          undefined as Provided<Dependencies>
+        if (options?.dependencies) {
           const makeCtx = (hono: HonoCtx): ProviderContext => {
             const ctx: ProviderContext = {
               hono,
@@ -420,9 +429,9 @@ export class BetterAPI {
           }
           const providerCtx = makeCtx(c)
           const entries = Object.entries(
-            options.deps as Record<string, Provider<unknown>>,
+            options.dependencies as Record<string, Provider<unknown>>,
           ).map(([k, p]) => [k, resolveProvider(p, providerCtx)] as const)
-          depsObject = Object.fromEntries(entries) as Provided<Deps>
+          depsObject = Object.fromEntries(entries) as Provided<Dependencies>
         }
 
         const context = new Context<
@@ -435,7 +444,7 @@ export class BetterAPI {
           FormDefinition,
           FileDefinition,
           FilesDefinition,
-          Deps
+          Dependencies
         >(
           c,
           typedParams as InferParams<ParamsDefinition>,
@@ -524,7 +533,9 @@ export class BetterAPI {
     FormDefinition extends ZodObject | undefined = undefined,
     FileDefinition extends ZodFile | undefined = undefined,
     FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
-    Deps extends Record<string, Provider<unknown>> | undefined = undefined,
+    Dependencies extends
+      | Record<string, Provider<unknown>>
+      | undefined = undefined,
   >(
     path: string,
     handler: (
@@ -538,7 +549,7 @@ export class BetterAPI {
         FormDefinition,
         FileDefinition,
         FilesDefinition,
-        Deps
+        Dependencies
       >,
     ) => HandlerReturnType<ResponseDefinition>,
     options?: RouteConfig<
@@ -551,7 +562,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >,
   ) {
     this.registerRoute<
@@ -564,7 +575,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >('post', path, handler, options)
   }
 
@@ -578,7 +589,9 @@ export class BetterAPI {
     FormDefinition extends ZodObject | undefined = undefined,
     FileDefinition extends ZodFile | undefined = undefined,
     FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
-    Deps extends Record<string, Provider<unknown>> | undefined = undefined,
+    Dependencies extends
+      | Record<string, Provider<unknown>>
+      | undefined = undefined,
   >(
     path: string,
     handler: (
@@ -592,7 +605,7 @@ export class BetterAPI {
         FormDefinition,
         FileDefinition,
         FilesDefinition,
-        Deps
+        Dependencies
       >,
     ) => HandlerReturnType<ResponseDefinition>,
     options?: RouteConfig<
@@ -605,7 +618,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >,
   ) {
     this.registerRoute<
@@ -618,7 +631,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >('get', path, handler, options)
   }
 
@@ -632,7 +645,9 @@ export class BetterAPI {
     FormDefinition extends ZodObject | undefined = undefined,
     FileDefinition extends ZodFile | undefined = undefined,
     FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
-    Deps extends Record<string, Provider<unknown>> | undefined = undefined,
+    Dependencies extends
+      | Record<string, Provider<unknown>>
+      | undefined = undefined,
   >(
     path: string,
     handler: (
@@ -646,7 +661,7 @@ export class BetterAPI {
         FormDefinition,
         FileDefinition,
         FilesDefinition,
-        Deps
+        Dependencies
       >,
     ) => HandlerReturnType<ResponseDefinition>,
     options?: RouteConfig<
@@ -659,7 +674,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >,
   ) {
     this.registerRoute<
@@ -672,7 +687,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >('put', path, handler, options)
   }
 
@@ -686,7 +701,9 @@ export class BetterAPI {
     FormDefinition extends ZodObject | undefined = undefined,
     FileDefinition extends ZodFile | undefined = undefined,
     FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
-    Deps extends Record<string, Provider<unknown>> | undefined = undefined,
+    Dependencies extends
+      | Record<string, Provider<unknown>>
+      | undefined = undefined,
   >(
     path: string,
     handler: (
@@ -700,7 +717,7 @@ export class BetterAPI {
         FormDefinition,
         FileDefinition,
         FilesDefinition,
-        Deps
+        Dependencies
       >,
     ) => HandlerReturnType<ResponseDefinition>,
     options?: RouteConfig<
@@ -713,7 +730,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >,
   ) {
     this.registerRoute<
@@ -726,7 +743,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >('delete', path, handler, options)
   }
 
@@ -740,7 +757,9 @@ export class BetterAPI {
     FormDefinition extends ZodObject | undefined = undefined,
     FileDefinition extends ZodFile | undefined = undefined,
     FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
-    Deps extends Record<string, Provider<unknown>> | undefined = undefined,
+    Dependencies extends
+      | Record<string, Provider<unknown>>
+      | undefined = undefined,
   >(
     path: string,
     handler: (
@@ -754,7 +773,7 @@ export class BetterAPI {
         FormDefinition,
         FileDefinition,
         FilesDefinition,
-        Deps
+        Dependencies
       >,
     ) => HandlerReturnType<ResponseDefinition>,
     options?: RouteConfig<
@@ -767,7 +786,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >,
   ) {
     this.registerRoute<
@@ -780,7 +799,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >('patch', path, handler, options)
   }
 
@@ -794,7 +813,9 @@ export class BetterAPI {
     FormDefinition extends ZodObject | undefined = undefined,
     FileDefinition extends ZodFile | undefined = undefined,
     FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
-    Deps extends Record<string, Provider<unknown>> | undefined = undefined,
+    Dependencies extends
+      | Record<string, Provider<unknown>>
+      | undefined = undefined,
   >(
     path: string,
     handler: (
@@ -808,7 +829,7 @@ export class BetterAPI {
         FormDefinition,
         FileDefinition,
         FilesDefinition,
-        Deps
+        Dependencies
       >,
     ) => HandlerReturnType<ResponseDefinition>,
     options?: RouteConfig<
@@ -821,7 +842,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >,
   ) {
     this.registerRoute<
@@ -834,7 +855,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >('options', path, handler, options)
   }
 
@@ -848,7 +869,9 @@ export class BetterAPI {
     FormDefinition extends ZodObject | undefined = undefined,
     FileDefinition extends ZodFile | undefined = undefined,
     FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
-    Deps extends Record<string, Provider<unknown>> | undefined = undefined,
+    Dependencies extends
+      | Record<string, Provider<unknown>>
+      | undefined = undefined,
   >(
     path: string,
     handler: (
@@ -862,7 +885,7 @@ export class BetterAPI {
         FormDefinition,
         FileDefinition,
         FilesDefinition,
-        Deps
+        Dependencies
       >,
     ) => HandlerReturnType<ResponseDefinition>,
     options?: RouteConfig<
@@ -875,7 +898,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >,
   ) {
     this.registerRoute<
@@ -888,7 +911,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >('head', path, handler, options)
   }
 
@@ -902,7 +925,9 @@ export class BetterAPI {
     FormDefinition extends ZodObject | undefined = undefined,
     FileDefinition extends ZodFile | undefined = undefined,
     FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
-    Deps extends Record<string, Provider<unknown>> | undefined = undefined,
+    Dependencies extends
+      | Record<string, Provider<unknown>>
+      | undefined = undefined,
   >(
     path: string,
     handler: (
@@ -916,7 +941,7 @@ export class BetterAPI {
         FormDefinition,
         FileDefinition,
         FilesDefinition,
-        Deps
+        Dependencies
       >,
     ) => HandlerReturnType<ResponseDefinition>,
     options?: RouteConfig<
@@ -929,7 +954,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >,
   ) {
     this.registerRoute<
@@ -942,7 +967,7 @@ export class BetterAPI {
       FormDefinition,
       FileDefinition,
       FilesDefinition,
-      Deps
+      Dependencies
     >('trace', path, handler, options)
   }
 }
