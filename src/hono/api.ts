@@ -7,7 +7,6 @@ import type { StatusCode } from 'hono/utils/http-status'
 import type { ZodArray, ZodFile, ZodObject, ZodType } from 'zod'
 import { Context } from '@/core/context'
 import {
-  kSecurityMeta,
   type Provider,
   type ProviderContext,
   resolveProvider,
@@ -17,7 +16,6 @@ import { addRouteSchema } from '@/core/openapi'
 import { JsonResponse } from '@/core/response'
 import type { RouteDefinition } from '@/hono/route'
 import type { HttpMethod } from '@/types/common'
-import type { SecurityRequirementObject } from '@/types/openapi'
 import type {
   InferAllResponses,
   InferBody,
@@ -28,43 +26,18 @@ import type {
   InferHeaders,
   InferParams,
   InferQuery,
-  SimplifiedZodResponseObject,
-  ZodResponseObject,
-} from '@/types/zod'
-import { convertResponseSchema } from '@/utils/response'
+} from '@/types/infer'
+import type {
+  BetterApiResponse,
+  ZodOpenApiResponsesObject,
+} from '@/types/response'
+import { normalizeZodOpenApiResponses } from '@/utils/response'
+import { isZodType } from '@/utils/zod'
 
-// 获取用于校验的schema，基于统一的ZodResponseObject格式
-function getValidationSchema(
-  convertedResponse: Partial<Record<StatusCode, ZodResponseObject>>,
-  statusCode: StatusCode,
-) {
-  const responseConfig = convertedResponse[statusCode]
-  if (!responseConfig) {
-    return null
-  }
-
-  const jsonContent = responseConfig.content['application/json']
-  return jsonContent.schema
-}
-
-// 统一的ResponseConfigMap类型，支持三种值类型：
-// 1. ZodType - 向后兼容原ResponseSchemaMap
-// 2. ZodResponseConfig - { description, schema, ... }
-// 3. ZodResponseObject - { description, content, ... }
-export type StatusResponseMap = Partial<
-  Record<StatusCode, ZodType | SimplifiedZodResponseObject | ZodResponseObject>
->
-
-export type ResponseSpec =
-  | ZodType
-  | SimplifiedZodResponseObject
-  | ZodResponseObject
-  | StatusResponseMap
-
-export type HandlerReturnType<ResponseDefinition> =
-  | InferAllResponses<ResponseDefinition>
+export type HandlerReturnType<Response> =
+  | InferAllResponses<Response>
   | Response
-  | Promise<InferAllResponses<ResponseDefinition> | Response>
+  | Promise<InferAllResponses<Response> | Response>
 
 export type Provided<
   Dependencies extends Record<string, Provider<unknown>> | undefined,
@@ -73,33 +46,32 @@ export type Provided<
   : undefined
 
 export interface RouteConfig<
-  ResponseDefinition,
-  ParamsDefinition,
-  QueryDefinition,
-  HeadersDefinition,
-  CookiesDefinition,
-  BodyDefinition,
-  FormDefinition,
-  FileDefinition,
-  FilesDefinition,
+  Responses,
+  Params,
+  Query,
+  Headers,
+  Cookies,
+  Body,
+  Form,
+  File,
+  Files,
   Dependencies,
 > {
-  responses?: ResponseDefinition
-  params?: ParamsDefinition
-  query?: QueryDefinition
-  headers?: HeadersDefinition
-  cookies?: CookiesDefinition
-  body?: BodyDefinition
-  form?: FormDefinition
-  file?: FileDefinition
-  files?: FilesDefinition
+  responses?: Responses
+  params?: Params
+  query?: Query
+  headers?: Headers
+  cookies?: Cookies
+  body?: Body
+  form?: Form
+  file?: File
+  files?: Files
   dependencies?: Dependencies
   summary?: string
   description?: string
   tags?: string[]
   operationId?: string
   deprecated?: boolean
-  security?: SecurityRequirementObject[]
 }
 
 export class BetterAPI {
@@ -123,29 +95,29 @@ export class BetterAPI {
 
   // 单个挂载
   mount<
-    ResponseDefinition extends ResponseSpec,
-    ParamsDefinition extends ZodObject | undefined = undefined,
-    QueryDefinition extends ZodObject | undefined = undefined,
-    HeadersDefinition extends ZodObject | undefined = undefined,
-    CookiesDefinition extends ZodObject | undefined = undefined,
-    BodyDefinition extends ZodType | undefined = undefined,
-    FormDefinition extends ZodObject | undefined = undefined,
-    FileDefinition extends ZodFile | undefined = undefined,
-    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
+    Response extends BetterApiResponse,
+    Params extends ZodObject | undefined = undefined,
+    Query extends ZodObject | undefined = undefined,
+    Headers extends ZodObject | undefined = undefined,
+    Cookies extends ZodObject | undefined = undefined,
+    Body extends ZodType | undefined = undefined,
+    Form extends ZodObject | undefined = undefined,
+    File extends ZodFile | undefined = undefined,
+    Files extends ZodArray<ZodFile> | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
   >(
     def: RouteDefinition<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >,
   ) {
@@ -213,15 +185,15 @@ export class BetterAPI {
   }
 
   private registerRoute<
-    ResponseDefinition extends ResponseSpec,
-    ParamsDefinition extends ZodObject | undefined = undefined,
-    QueryDefinition extends ZodObject | undefined = undefined,
-    HeadersDefinition extends ZodObject | undefined = undefined,
-    CookiesDefinition extends ZodObject | undefined = undefined,
-    BodyDefinition extends ZodType | undefined = undefined,
-    FormDefinition extends ZodObject | undefined = undefined,
-    FileDefinition extends ZodFile | undefined = undefined,
-    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
+    Response extends BetterApiResponse,
+    Params extends ZodObject | undefined = undefined,
+    Query extends ZodObject | undefined = undefined,
+    Headers extends ZodObject | undefined = undefined,
+    Cookies extends ZodObject | undefined = undefined,
+    Body extends ZodType | undefined = undefined,
+    Form extends ZodObject | undefined = undefined,
+    File extends ZodFile | undefined = undefined,
+    Files extends ZodArray<ZodFile> | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -230,60 +202,38 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        ResponseDefinition,
-        ParamsDefinition,
-        QueryDefinition,
-        HeadersDefinition,
-        CookiesDefinition,
-        BodyDefinition,
-        FormDefinition,
-        FileDefinition,
-        FilesDefinition,
+        Response,
+        Params,
+        Query,
+        Headers,
+        Cookies,
+        Body,
+        Form,
+        File,
+        Files,
         Dependencies
       >,
-    ) => HandlerReturnType<ResponseDefinition>,
+    ) => HandlerReturnType<Response>,
     options?: RouteConfig<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >,
   ) {
-    // auto derive security from dependencies
-    let derivedSecurity: SecurityRequirementObject[] | undefined
-    if (options?.dependencies) {
-      const reqs: SecurityRequirementObject[] = []
-      for (const [, prov] of Object.entries(
-        options.dependencies as Record<string, Provider<unknown>>,
-      )) {
-        const meta = (
-          prov as unknown as Record<
-            symbol,
-            { scheme: string; scopes?: string[] }
-          >
-        )[kSecurityMeta as unknown as symbol]
-        if (meta?.scheme) {
-          reqs.push({ [meta.scheme]: meta.scopes ?? [] })
-        }
-      }
-      if (reqs.length) {
-        derivedSecurity = reqs
-      }
-    }
-
     // 转换响应配置为统一的ZodResponseObject格式
-    const convertedResponse = convertResponseSchema(options?.responses)
+    const responses = normalizeZodOpenApiResponses(options?.responses ?? {})
 
     addRouteSchema({
       path,
       method,
-      response: convertedResponse,
+      responses,
       params: options?.params,
       query: options?.query,
       headers: options?.headers,
@@ -297,7 +247,6 @@ export class BetterAPI {
       tags: options?.tags,
       operationId: options?.operationId,
       deprecated: options?.deprecated,
-      security: options?.security ?? derivedSecurity,
     })
 
     const wrapper: Handler = async (c) => {
@@ -435,32 +384,32 @@ export class BetterAPI {
         }
 
         const context = new Context<
-          ResponseDefinition,
-          ParamsDefinition,
-          QueryDefinition,
-          HeadersDefinition,
-          CookiesDefinition,
-          BodyDefinition,
-          FormDefinition,
-          FileDefinition,
-          FilesDefinition,
+          Response,
+          Params,
+          Query,
+          Headers,
+          Cookies,
+          Body,
+          Form,
+          File,
+          Files,
           Dependencies
         >(
           c,
-          typedParams as InferParams<ParamsDefinition>,
-          typedQuery as InferQuery<QueryDefinition>,
-          typedHeaders as InferHeaders<HeadersDefinition>,
-          typedCookies as InferCookies<CookiesDefinition>,
-          typedBody as InferBody<BodyDefinition>,
-          typedForm as InferForm<FormDefinition>,
-          typedFile as InferFile<FileDefinition>,
-          typedFiles as InferFiles<FilesDefinition>,
+          typedParams as InferParams<Params>,
+          typedQuery as InferQuery<Query>,
+          typedHeaders as InferHeaders<Headers>,
+          typedCookies as InferCookies<Cookies>,
+          typedBody as InferBody<Body>,
+          typedForm as InferForm<Form>,
+          typedFile as InferFile<File>,
+          typedFiles as InferFiles<Files>,
           depsObject,
         )
 
         const result = await handler(context)
 
-        if (convertedResponse) {
+        if (responses) {
           const shouldValidate =
             result instanceof JsonResponse || !(result instanceof Response)
 
@@ -475,8 +424,8 @@ export class BetterAPI {
                 : 200
 
             const validationSchema = getValidationSchema(
-              convertedResponse,
-              statusCode,
+              responses,
+              String(statusCode) as `${1 | 2 | 3 | 4 | 5}${string}`,
             )
 
             if (validationSchema) {
@@ -524,15 +473,15 @@ export class BetterAPI {
   }
 
   post<
-    ResponseDefinition extends ResponseSpec,
-    ParamsDefinition extends ZodObject | undefined = undefined,
-    QueryDefinition extends ZodObject | undefined = undefined,
-    HeadersDefinition extends ZodObject | undefined = undefined,
-    CookiesDefinition extends ZodObject | undefined = undefined,
-    BodyDefinition extends ZodType | undefined = undefined,
-    FormDefinition extends ZodObject | undefined = undefined,
-    FileDefinition extends ZodFile | undefined = undefined,
-    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
+    Response extends BetterApiResponse,
+    Params extends ZodObject | undefined = undefined,
+    Query extends ZodObject | undefined = undefined,
+    Headers extends ZodObject | undefined = undefined,
+    Cookies extends ZodObject | undefined = undefined,
+    Body extends ZodType | undefined = undefined,
+    Form extends ZodObject | undefined = undefined,
+    File extends ZodFile | undefined = undefined,
+    Files extends ZodArray<ZodFile> | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -540,55 +489,55 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        ResponseDefinition,
-        ParamsDefinition,
-        QueryDefinition,
-        HeadersDefinition,
-        CookiesDefinition,
-        BodyDefinition,
-        FormDefinition,
-        FileDefinition,
-        FilesDefinition,
+        Response,
+        Params,
+        Query,
+        Headers,
+        Cookies,
+        Body,
+        Form,
+        File,
+        Files,
         Dependencies
       >,
-    ) => HandlerReturnType<ResponseDefinition>,
+    ) => HandlerReturnType<Response>,
     options?: RouteConfig<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >,
   ) {
     this.registerRoute<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >('post', path, handler, options)
   }
 
   get<
-    ResponseDefinition extends ResponseSpec,
-    ParamsDefinition extends ZodObject | undefined = undefined,
-    QueryDefinition extends ZodObject | undefined = undefined,
-    HeadersDefinition extends ZodObject | undefined = undefined,
-    CookiesDefinition extends ZodObject | undefined = undefined,
-    BodyDefinition extends ZodType | undefined = undefined,
-    FormDefinition extends ZodObject | undefined = undefined,
-    FileDefinition extends ZodFile | undefined = undefined,
-    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
+    Response extends BetterApiResponse,
+    Params extends ZodObject | undefined = undefined,
+    Query extends ZodObject | undefined = undefined,
+    Headers extends ZodObject | undefined = undefined,
+    Cookies extends ZodObject | undefined = undefined,
+    Body extends ZodType | undefined = undefined,
+    Form extends ZodObject | undefined = undefined,
+    File extends ZodFile | undefined = undefined,
+    Files extends ZodArray<ZodFile> | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -596,55 +545,55 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        ResponseDefinition,
-        ParamsDefinition,
-        QueryDefinition,
-        HeadersDefinition,
-        CookiesDefinition,
-        BodyDefinition,
-        FormDefinition,
-        FileDefinition,
-        FilesDefinition,
+        Response,
+        Params,
+        Query,
+        Headers,
+        Cookies,
+        Body,
+        Form,
+        File,
+        Files,
         Dependencies
       >,
-    ) => HandlerReturnType<ResponseDefinition>,
+    ) => HandlerReturnType<Response>,
     options?: RouteConfig<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >,
   ) {
     this.registerRoute<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >('get', path, handler, options)
   }
 
   put<
-    ResponseDefinition extends ResponseSpec,
-    ParamsDefinition extends ZodObject | undefined = undefined,
-    QueryDefinition extends ZodObject | undefined = undefined,
-    HeadersDefinition extends ZodObject | undefined = undefined,
-    CookiesDefinition extends ZodObject | undefined = undefined,
-    BodyDefinition extends ZodType | undefined = undefined,
-    FormDefinition extends ZodObject | undefined = undefined,
-    FileDefinition extends ZodFile | undefined = undefined,
-    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
+    Response extends BetterApiResponse,
+    Params extends ZodObject | undefined = undefined,
+    Query extends ZodObject | undefined = undefined,
+    Headers extends ZodObject | undefined = undefined,
+    Cookies extends ZodObject | undefined = undefined,
+    Body extends ZodType | undefined = undefined,
+    Form extends ZodObject | undefined = undefined,
+    File extends ZodFile | undefined = undefined,
+    Files extends ZodArray<ZodFile> | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -652,55 +601,55 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        ResponseDefinition,
-        ParamsDefinition,
-        QueryDefinition,
-        HeadersDefinition,
-        CookiesDefinition,
-        BodyDefinition,
-        FormDefinition,
-        FileDefinition,
-        FilesDefinition,
+        Response,
+        Params,
+        Query,
+        Headers,
+        Cookies,
+        Body,
+        Form,
+        File,
+        Files,
         Dependencies
       >,
-    ) => HandlerReturnType<ResponseDefinition>,
+    ) => HandlerReturnType<Response>,
     options?: RouteConfig<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >,
   ) {
     this.registerRoute<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >('put', path, handler, options)
   }
 
   delete<
-    ResponseDefinition extends ResponseSpec,
-    ParamsDefinition extends ZodObject | undefined = undefined,
-    QueryDefinition extends ZodObject | undefined = undefined,
-    HeadersDefinition extends ZodObject | undefined = undefined,
-    CookiesDefinition extends ZodObject | undefined = undefined,
-    BodyDefinition extends ZodType | undefined = undefined,
-    FormDefinition extends ZodObject | undefined = undefined,
-    FileDefinition extends ZodFile | undefined = undefined,
-    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
+    Response extends BetterApiResponse,
+    Params extends ZodObject | undefined = undefined,
+    Query extends ZodObject | undefined = undefined,
+    Headers extends ZodObject | undefined = undefined,
+    Cookies extends ZodObject | undefined = undefined,
+    Body extends ZodType | undefined = undefined,
+    Form extends ZodObject | undefined = undefined,
+    File extends ZodFile | undefined = undefined,
+    Files extends ZodArray<ZodFile> | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -708,55 +657,55 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        ResponseDefinition,
-        ParamsDefinition,
-        QueryDefinition,
-        HeadersDefinition,
-        CookiesDefinition,
-        BodyDefinition,
-        FormDefinition,
-        FileDefinition,
-        FilesDefinition,
+        Response,
+        Params,
+        Query,
+        Headers,
+        Cookies,
+        Body,
+        Form,
+        File,
+        Files,
         Dependencies
       >,
-    ) => HandlerReturnType<ResponseDefinition>,
+    ) => HandlerReturnType<Response>,
     options?: RouteConfig<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >,
   ) {
     this.registerRoute<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >('delete', path, handler, options)
   }
 
   patch<
-    ResponseDefinition extends ResponseSpec,
-    ParamsDefinition extends ZodObject | undefined = undefined,
-    QueryDefinition extends ZodObject | undefined = undefined,
-    HeadersDefinition extends ZodObject | undefined = undefined,
-    CookiesDefinition extends ZodObject | undefined = undefined,
-    BodyDefinition extends ZodType | undefined = undefined,
-    FormDefinition extends ZodObject | undefined = undefined,
-    FileDefinition extends ZodFile | undefined = undefined,
-    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
+    Response extends BetterApiResponse,
+    Params extends ZodObject | undefined = undefined,
+    Query extends ZodObject | undefined = undefined,
+    Headers extends ZodObject | undefined = undefined,
+    Cookies extends ZodObject | undefined = undefined,
+    Body extends ZodType | undefined = undefined,
+    Form extends ZodObject | undefined = undefined,
+    File extends ZodFile | undefined = undefined,
+    Files extends ZodArray<ZodFile> | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -764,55 +713,55 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        ResponseDefinition,
-        ParamsDefinition,
-        QueryDefinition,
-        HeadersDefinition,
-        CookiesDefinition,
-        BodyDefinition,
-        FormDefinition,
-        FileDefinition,
-        FilesDefinition,
+        Response,
+        Params,
+        Query,
+        Headers,
+        Cookies,
+        Body,
+        Form,
+        File,
+        Files,
         Dependencies
       >,
-    ) => HandlerReturnType<ResponseDefinition>,
+    ) => HandlerReturnType<Response>,
     options?: RouteConfig<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >,
   ) {
     this.registerRoute<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >('patch', path, handler, options)
   }
 
   options<
-    ResponseDefinition extends ResponseSpec,
-    ParamsDefinition extends ZodObject | undefined = undefined,
-    QueryDefinition extends ZodObject | undefined = undefined,
-    HeadersDefinition extends ZodObject | undefined = undefined,
-    CookiesDefinition extends ZodObject | undefined = undefined,
-    BodyDefinition extends ZodType | undefined = undefined,
-    FormDefinition extends ZodObject | undefined = undefined,
-    FileDefinition extends ZodFile | undefined = undefined,
-    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
+    Response extends BetterApiResponse,
+    Params extends ZodObject | undefined = undefined,
+    Query extends ZodObject | undefined = undefined,
+    Headers extends ZodObject | undefined = undefined,
+    Cookies extends ZodObject | undefined = undefined,
+    Body extends ZodType | undefined = undefined,
+    Form extends ZodObject | undefined = undefined,
+    File extends ZodFile | undefined = undefined,
+    Files extends ZodArray<ZodFile> | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -820,55 +769,55 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        ResponseDefinition,
-        ParamsDefinition,
-        QueryDefinition,
-        HeadersDefinition,
-        CookiesDefinition,
-        BodyDefinition,
-        FormDefinition,
-        FileDefinition,
-        FilesDefinition,
+        Response,
+        Params,
+        Query,
+        Headers,
+        Cookies,
+        Body,
+        Form,
+        File,
+        Files,
         Dependencies
       >,
-    ) => HandlerReturnType<ResponseDefinition>,
+    ) => HandlerReturnType<Response>,
     options?: RouteConfig<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >,
   ) {
     this.registerRoute<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >('options', path, handler, options)
   }
 
   head<
-    ResponseDefinition extends ResponseSpec,
-    ParamsDefinition extends ZodObject | undefined = undefined,
-    QueryDefinition extends ZodObject | undefined = undefined,
-    HeadersDefinition extends ZodObject | undefined = undefined,
-    CookiesDefinition extends ZodObject | undefined = undefined,
-    BodyDefinition extends ZodType | undefined = undefined,
-    FormDefinition extends ZodObject | undefined = undefined,
-    FileDefinition extends ZodFile | undefined = undefined,
-    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
+    Response extends BetterApiResponse,
+    Params extends ZodObject | undefined = undefined,
+    Query extends ZodObject | undefined = undefined,
+    Headers extends ZodObject | undefined = undefined,
+    Cookies extends ZodObject | undefined = undefined,
+    Body extends ZodType | undefined = undefined,
+    Form extends ZodObject | undefined = undefined,
+    File extends ZodFile | undefined = undefined,
+    Files extends ZodArray<ZodFile> | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -876,55 +825,55 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        ResponseDefinition,
-        ParamsDefinition,
-        QueryDefinition,
-        HeadersDefinition,
-        CookiesDefinition,
-        BodyDefinition,
-        FormDefinition,
-        FileDefinition,
-        FilesDefinition,
+        Response,
+        Params,
+        Query,
+        Headers,
+        Cookies,
+        Body,
+        Form,
+        File,
+        Files,
         Dependencies
       >,
-    ) => HandlerReturnType<ResponseDefinition>,
+    ) => HandlerReturnType<Response>,
     options?: RouteConfig<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >,
   ) {
     this.registerRoute<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >('head', path, handler, options)
   }
 
   trace<
-    ResponseDefinition extends ResponseSpec,
-    ParamsDefinition extends ZodObject | undefined = undefined,
-    QueryDefinition extends ZodObject | undefined = undefined,
-    HeadersDefinition extends ZodObject | undefined = undefined,
-    CookiesDefinition extends ZodObject | undefined = undefined,
-    BodyDefinition extends ZodType | undefined = undefined,
-    FormDefinition extends ZodObject | undefined = undefined,
-    FileDefinition extends ZodFile | undefined = undefined,
-    FilesDefinition extends ZodArray<ZodFile> | undefined = undefined,
+    Response extends BetterApiResponse,
+    Params extends ZodObject | undefined = undefined,
+    Query extends ZodObject | undefined = undefined,
+    Headers extends ZodObject | undefined = undefined,
+    Cookies extends ZodObject | undefined = undefined,
+    Body extends ZodType | undefined = undefined,
+    Form extends ZodObject | undefined = undefined,
+    File extends ZodFile | undefined = undefined,
+    Files extends ZodArray<ZodFile> | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -932,42 +881,50 @@ export class BetterAPI {
     path: string,
     handler: (
       context: Context<
-        ResponseDefinition,
-        ParamsDefinition,
-        QueryDefinition,
-        HeadersDefinition,
-        CookiesDefinition,
-        BodyDefinition,
-        FormDefinition,
-        FileDefinition,
-        FilesDefinition,
+        Response,
+        Params,
+        Query,
+        Headers,
+        Cookies,
+        Body,
+        Form,
+        File,
+        Files,
         Dependencies
       >,
-    ) => HandlerReturnType<ResponseDefinition>,
+    ) => HandlerReturnType<Response>,
     options?: RouteConfig<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >,
   ) {
     this.registerRoute<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >('trace', path, handler, options)
   }
+}
+
+function getValidationSchema(
+  responses: ZodOpenApiResponsesObject,
+  statusCode: `${1 | 2 | 3 | 4 | 5}${string}`,
+) {
+  const schema = responses[statusCode]?.content?.['application/json']?.schema
+  return isZodType(schema) ? schema : null
 }

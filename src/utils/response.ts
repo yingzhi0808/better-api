@@ -1,25 +1,28 @@
-import type { StatusCode } from 'hono/utils/http-status'
-import type { ResponseSpec, StatusResponseMap } from '@/hono/api'
+import type { Response } from '@/hono/api'
 import type {
-  SimplifiedZodResponseObject,
-  ZodResponseObject,
-} from '@/types/zod'
+  BetterApiResponses,
+  SimplifiedZodOpenApiResponseObject,
+  ZodOpenApiResponseObject,
+  ZodOpenApiResponsesObject,
+} from '@/types/response'
 import { isZodType } from '@/utils/zod'
 
 // 辅助函数：判断是否为ZodResponseConfig
 export function isSimplifiedZodResponseObject(
   obj: unknown,
-): obj is SimplifiedZodResponseObject {
+): obj is SimplifiedZodOpenApiResponseObject {
   return obj !== null && typeof obj === 'object' && 'schema' in obj
 }
 
 // 辅助函数：判断是否为ZodResponseObject
-export function isZodResponseObject(obj: unknown): obj is ZodResponseObject {
+export function isZodResponseObject(
+  obj: unknown,
+): obj is ZodOpenApiResponseObject {
   return obj !== null && typeof obj === 'object' && 'content' in obj
 }
 
 // 辅助函数：判断是否为ResponseConfigMap
-export function isStatusResponseMap(obj: unknown): obj is StatusResponseMap {
+export function isStatusResponseMap(obj: unknown): obj is BetterApiResponses {
   if (obj === null || typeof obj !== 'object') {
     return false
   }
@@ -33,27 +36,25 @@ export function isStatusResponseMap(obj: unknown): obj is StatusResponseMap {
 }
 
 // 转换响应配置为统一的ZodResponseObject格式
-export function convertResponseSchema(response?: ResponseSpec) {
-  if (!response) {
-    return undefined
-  }
-
+export function normalizeZodOpenApiResponses(
+  responses: Response,
+): ZodOpenApiResponsesObject {
   // 情况1: 直接的ZodType -> 转换为200状态码
-  if (isZodType(response)) {
+  if (isZodType(responses)) {
     return {
       200: {
         content: {
           'application/json': {
-            schema: response,
+            schema: responses,
           },
         },
       },
     }
   }
 
-  // 情况2: SimplifiedZodResponseObject -> 转换为200状态码
-  if (isSimplifiedZodResponseObject(response)) {
-    const { schema, links, description, headers, ...rest } = response
+  // 情况2: SimplifiedZodOpenApiResponseObject -> 转换为200状态码
+  if (isSimplifiedZodResponseObject(responses)) {
+    const { schema, links, description, headers, ...rest } = responses
     return {
       200: {
         links,
@@ -69,21 +70,22 @@ export function convertResponseSchema(response?: ResponseSpec) {
     }
   }
 
-  // 情况3: ZodResponseObject -> 转换为200状态码
-  if (isZodResponseObject(response)) {
+  // 情况3: ZodOpenApiResponseObject -> 转换为200状态码
+  if (isZodResponseObject(responses)) {
     return {
-      200: response,
+      200: responses,
     }
   }
 
   // 情况4: StatusResponseMap -> 转换每个状态码
-  if (isStatusResponseMap(response)) {
-    const result: Partial<Record<StatusCode, ZodResponseObject>> = {}
-    for (const [statusCode, config] of Object.entries(response)) {
-      const status = Number(statusCode) as StatusCode
+  if (isStatusResponseMap(responses)) {
+    const result: ZodOpenApiResponsesObject = {}
+    for (const [statusCode, config] of Object.entries(responses)) {
+      const status = statusCode as `${1 | 2 | 3 | 4 | 5}${string}`
 
       if (isZodType(config)) {
         result[status] = {
+          description: '',
           content: {
             'application/json': {
               schema: config,
@@ -110,5 +112,5 @@ export function convertResponseSchema(response?: ResponseSpec) {
     return result
   }
 
-  return undefined
+  return {}
 }

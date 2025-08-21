@@ -1,34 +1,35 @@
 import type z from 'zod'
 import type { ZodObject } from 'zod'
 import type { Provider } from '@/core/di'
-import type { HandlerReturnType, ResponseSpec, RouteConfig } from '@/hono/api'
+import type { HandlerReturnType, RouteConfig } from '@/hono/api'
 import type { HttpMethod } from '@/types/common'
+import type { ResponsesDefinition } from '@/types/response'
 import type { Context as BetterContext } from '../core/context'
 
 export function route<
-  ResponseDefinition extends ResponseSpec = undefined,
-  ParamsDefinition extends ZodObject | undefined = undefined,
-  QueryDefinition extends ZodObject | undefined = undefined,
-  HeadersDefinition extends ZodObject | undefined = undefined,
-  CookiesDefinition extends ZodObject | undefined = undefined,
-  BodyDefinition extends z.ZodTypeAny | undefined = undefined,
-  FormDefinition extends z.ZodTypeAny | undefined = undefined,
-  FileDefinition extends z.ZodTypeAny | undefined = undefined,
-  FilesDefinition extends z.ZodTypeAny | undefined = undefined,
+  Responses extends ResponsesDefinition = undefined,
+  Params extends ZodObject | undefined = undefined,
+  Query extends ZodObject | undefined = undefined,
+  Headers extends ZodObject | undefined = undefined,
+  Cookies extends ZodObject | undefined = undefined,
+  Body extends z.ZodTypeAny | undefined = undefined,
+  Form extends z.ZodTypeAny | undefined = undefined,
+  File extends z.ZodTypeAny | undefined = undefined,
+  Files extends z.ZodTypeAny | undefined = undefined,
   Dependencies extends
     | Record<string, Provider<unknown>>
     | undefined = undefined,
 >(
   def: RouteConfig<
-    ResponseDefinition,
-    ParamsDefinition,
-    QueryDefinition,
-    HeadersDefinition,
-    CookiesDefinition,
-    BodyDefinition,
-    FormDefinition,
-    FileDefinition,
-    FilesDefinition,
+    Responses,
+    Params,
+    Query,
+    Headers,
+    Cookies,
+    Body,
+    Form,
+    File,
+    Files,
     Dependencies
   >,
 ) {
@@ -36,15 +37,15 @@ export function route<
 }
 
 export type RouteDefinition<
-  ResponseDefinition extends ResponseSpec = undefined,
-  ParamsDefinition extends ZodObject | undefined = undefined,
-  QueryDefinition extends ZodObject | undefined = undefined,
-  HeadersDefinition extends ZodObject | undefined = undefined,
-  CookiesDefinition extends ZodObject | undefined = undefined,
-  BodyDefinition extends z.ZodTypeAny | undefined = undefined,
-  FormDefinition extends z.ZodTypeAny | undefined = undefined,
-  FileDefinition extends z.ZodTypeAny | undefined = undefined,
-  FilesDefinition extends z.ZodTypeAny | undefined = undefined,
+  Response extends Response = undefined,
+  Params extends ZodObject | undefined = undefined,
+  Query extends ZodObject | undefined = undefined,
+  Headers extends ZodObject | undefined = undefined,
+  Cookies extends ZodObject | undefined = undefined,
+  Body extends z.ZodTypeAny | undefined = undefined,
+  Form extends z.ZodTypeAny | undefined = undefined,
+  File extends z.ZodTypeAny | undefined = undefined,
+  Files extends z.ZodTypeAny | undefined = undefined,
   Dependencies extends
     | Record<string, Provider<unknown>>
     | undefined = undefined,
@@ -53,58 +54,56 @@ export type RouteDefinition<
   path: string
   handler: (
     ctx: BetterContext<
-      ResponseDefinition,
-      ParamsDefinition,
-      QueryDefinition,
-      HeadersDefinition,
-      CookiesDefinition,
-      BodyDefinition,
-      FormDefinition,
-      FileDefinition,
-      FilesDefinition,
+      Response,
+      Params,
+      Query,
+      Headers,
+      Cookies,
+      Body,
+      Form,
+      File,
+      Files,
       Dependencies
     >,
-  ) =>
-    | HandlerReturnType<ResponseDefinition>
-    | Promise<HandlerReturnType<ResponseDefinition>>
+  ) => HandlerReturnType<Response> | Promise<HandlerReturnType<Response>>
   schema?: RouteConfig<
-    ResponseDefinition,
-    ParamsDefinition,
-    QueryDefinition,
-    HeadersDefinition,
-    CookiesDefinition,
-    BodyDefinition,
-    FormDefinition,
-    FileDefinition,
-    FilesDefinition,
+    Response,
+    Params,
+    Query,
+    Headers,
+    Cookies,
+    Body,
+    Form,
+    File,
+    Files,
     Dependencies
   >
 }
 
 export function defineRoute<
-  ResponseDefinition extends ResponseSpec = undefined,
-  ParamsDefinition extends ZodObject | undefined = undefined,
-  QueryDefinition extends ZodObject | undefined = undefined,
-  HeadersDefinition extends ZodObject | undefined = undefined,
-  CookiesDefinition extends ZodObject | undefined = undefined,
-  BodyDefinition extends z.ZodTypeAny | undefined = undefined,
-  FormDefinition extends z.ZodTypeAny | undefined = undefined,
-  FileDefinition extends z.ZodTypeAny | undefined = undefined,
-  FilesDefinition extends z.ZodTypeAny | undefined = undefined,
+  Response extends Response = undefined,
+  Params extends ZodObject | undefined = undefined,
+  Query extends ZodObject | undefined = undefined,
+  Headers extends ZodObject | undefined = undefined,
+  Cookies extends ZodObject | undefined = undefined,
+  Body extends z.ZodTypeAny | undefined = undefined,
+  Form extends z.ZodTypeAny | undefined = undefined,
+  File extends z.ZodTypeAny | undefined = undefined,
+  Files extends z.ZodTypeAny | undefined = undefined,
   Dependencies extends
     | Record<string, Provider<unknown>>
     | undefined = undefined,
 >(
   def: RouteDefinition<
-    ResponseDefinition,
-    ParamsDefinition,
-    QueryDefinition,
-    HeadersDefinition,
-    CookiesDefinition,
-    BodyDefinition,
-    FormDefinition,
-    FileDefinition,
-    FilesDefinition,
+    Response,
+    Params,
+    Query,
+    Headers,
+    Cookies,
+    Body,
+    Form,
+    File,
+    Files,
     Dependencies
   >,
 ) {

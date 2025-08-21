@@ -51,17 +51,18 @@
     "preinstall": "npx only-allow pnpm"
   },
   "dependencies": {
-    "@upstash/ratelimit": "^2.0.6",
-    "@upstash/redis": "^1.35.3",
     "@hono/node-server": "^1.19.0",
     "@hono/node-ws": "^1.2.0",
     "@hono/zod-validator": "^0.7.2",
     "@hyperjump/json-schema": "^1.16.2",
+    "@upstash/ratelimit": "^2.0.6",
+    "@upstash/redis": "^1.35.3",
     "hono": "^4.9.2",
     "radashi": "^12.6.1",
     "supertest": "^7.1.4",
     "swagger-ui-dist": "^5.27.1",
-    "zod": "^4.0.17"
+    "zod": "^4.0.17",
+    "zod-openapi": "^5.3.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.0",
