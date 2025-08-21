@@ -12,7 +12,7 @@ import {
   resolveProvider,
   runWithRequestScope,
 } from '@/core/di'
-import { addRouteSchema } from '@/core/openapi'
+import { registerOpenApiRoute } from '@/core/openapi'
 import { JsonResponse } from '@/core/response'
 import type { HttpMethod } from '@/types/common'
 import type {
@@ -130,7 +130,7 @@ export class BetterAPI {
   ) {
     const responses = normalizeZodOpenApiResponses(options?.responses ?? {})
 
-    addRouteSchema({
+    registerOpenApiRoute({
       path,
       method,
       responses,

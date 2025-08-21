@@ -14,13 +14,9 @@ import {
   type ZodOpenApiPathsObject,
   type ZodOpenApiRequestBodyObject,
 } from 'zod-openapi'
+import { convertExpressPathToOpenAPI } from '@/utils/openapi'
 
-/** 将 Hono 路径参数格式转换为 OpenAPI 格式: `/users/:id` -> `/users/{id}` */
-function convertExpressPathToOpenAPI(path: string) {
-  return path.replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, '{$1}')
-}
-
-interface RouteSchema {
+interface OpenApiRoute {
   path: string
   method: string
   responses?: ZodOpenApiResponsesObject
@@ -39,10 +35,10 @@ interface RouteSchema {
   deprecated?: boolean
 }
 
-const globalRouteSchemas: RouteSchema[] = []
+const globalRoutes: OpenApiRoute[] = []
 
-export function addRouteSchema(schema: RouteSchema) {
-  globalRouteSchemas.push(schema)
+export function registerOpenApiRoute(route: OpenApiRoute) {
+  globalRoutes.push(route)
 }
 
 let globalResponses: BetterApiResponses = {}
@@ -51,7 +47,31 @@ export function setGlobalResponses(responses: BetterApiResponses) {
   globalResponses = responses
 }
 
-function createZodOpenApiPath(route: RouteSchema) {
+export function generateOpenAPI() {
+  const paths: ZodOpenApiPathsObject = {}
+
+  for (const route of globalRoutes) {
+    const path = convertExpressPathToOpenAPI(route.path)
+
+    if (!paths[path]) {
+      paths[path] = {}
+    }
+
+    const pathOperation = createZodOpenApiPath(route)
+    paths[path] = { ...paths[path], ...pathOperation }
+  }
+
+  return createDocument({
+    openapi: '3.1.0',
+    info: {
+      title: 'API',
+      version: '1.0.0',
+    },
+    paths,
+  })
+}
+
+function createZodOpenApiPath(route: OpenApiRoute) {
   const requestParams: ZodOpenApiParameters = {}
   if (route.params) {
     requestParams.path = route.params
@@ -130,28 +150,4 @@ function createZodOpenApiPath(route: RouteSchema) {
   }
 
   return { [route.method]: operation }
-}
-
-export function generateOpenAPI() {
-  const paths: ZodOpenApiPathsObject = {}
-
-  for (const route of globalRouteSchemas) {
-    const path = convertExpressPathToOpenAPI(route.path)
-
-    if (!paths[path]) {
-      paths[path] = {}
-    }
-
-    const pathOperation = createZodOpenApiPath(route)
-    paths[path] = { ...paths[path], ...pathOperation }
-  }
-
-  return createDocument({
-    openapi: '3.1.0',
-    info: {
-      title: 'API',
-      version: '1.0.0',
-    },
-    paths,
-  })
 }
