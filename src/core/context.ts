@@ -51,11 +51,11 @@ export class Context<
   json<
     Data extends InferResponse<Responses, Status>,
     Status extends InferStatus<Responses>,
-  >(data: Data, status: Status): JsonResponse<Data, Status>
+  >(data: Data, status: StatusOrInit<Status>): JsonResponse<Data, Status>
   json<
     Data extends InferResponse<Responses, Status>,
     Status extends InferStatus<Responses>,
-  >(data: Data, status?: Status) {
+  >(data: Data, status?: StatusOrInit<Status>) {
     return new JsonResponse(data, status)
   }
 
