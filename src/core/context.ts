@@ -1,6 +1,4 @@
 import type { Context as HonoCtx } from 'hono'
-import type { StatusCode } from 'hono/utils/http-status'
-import type { ZodType } from 'zod'
 import type { Provider } from '@/core/di'
 import { HtmlResponse, JsonResponse, TextResponse } from '@/core/response'
 import type { Provided } from '@/hono/api'
@@ -16,7 +14,6 @@ import type {
   InferResponse,
   InferStatus,
 } from '@/types/infer'
-import type { BetterApiResponses } from '@/types/response'
 import type { StatusOrInit } from './response'
 
 export class Context<
@@ -50,38 +47,26 @@ export class Context<
   >(data: Data): JsonResponse<Data, Status>
   json<
     Data extends InferResponse<Responses, Status>,
-    Status extends InferStatus<Responses>,
-  >(data: Data, status: StatusOrInit<Status>): JsonResponse<Data, Status>
+    const Status extends InferStatus<Responses>,
+  >(data: Data, statusOrInit: StatusOrInit<Status>): JsonResponse<Data, Status>
   json<
     Data extends InferResponse<Responses, Status>,
-    Status extends InferStatus<Responses>,
-  >(data: Data, status?: StatusOrInit<Status>) {
-    return new JsonResponse(data, status)
+    const Status extends InferStatus<Responses>,
+  >(data: Data, statusOrInit?: StatusOrInit<Status>) {
+    return new JsonResponse(data, statusOrInit)
   }
 
-  html<
-    const Data extends string,
-    const Status extends Responses extends BetterApiResponses
-      ? keyof Responses & StatusCode
-      : Responses extends ZodType
-        ? 200
-        : Responses extends undefined
-          ? StatusCode
-          : never,
-  >(data: Data, statusOrInit?: StatusOrInit<Status>) {
+  html<Data extends string, const Status extends InferStatus<Responses>>(
+    data: Data,
+    statusOrInit?: StatusOrInit<Status>,
+  ) {
     return new HtmlResponse(data, statusOrInit)
   }
 
-  text<
-    const Data extends string,
-    const Status extends Responses extends BetterApiResponses
-      ? keyof Responses & StatusCode
-      : Responses extends ZodType
-        ? 200
-        : Responses extends undefined
-          ? StatusCode
-          : never,
-  >(data: Data, statusOrInit?: StatusOrInit<Status>) {
+  text<Data extends string, const Status extends InferStatus<Responses>>(
+    data: Data,
+    statusOrInit?: StatusOrInit<Status>,
+  ) {
     return new TextResponse(data, statusOrInit)
   }
 }

@@ -34,8 +34,8 @@ import { normalizeZodOpenApiResponses } from '@/utils/response'
 import { isZodType } from '@/utils/zod'
 
 export type HandlerReturnType<Responses> =
-  | InferAllResponses<Responses>
   | Response
+  | InferAllResponses<Responses>
   | Promise<InferAllResponses<Responses> | Response>
 
 export type Provided<
