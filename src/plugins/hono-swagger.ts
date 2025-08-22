@@ -31,7 +31,7 @@ export function mountSwaggerUI(app: Hono, options?: HonoSwaggerOptions) {
     return c.html(html)
   })
 
-  app.get('/openapi.json', async (c) => {
+  app.get('/openapi.json', (c) => {
     return c.json(generateOpenAPI())
   })
 }
