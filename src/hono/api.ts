@@ -12,7 +12,11 @@ import {
   resolveProvider,
   runWithRequestScope,
 } from '@/core/di'
-import { registerOpenApiRoute } from '@/core/openapi'
+import {
+  type BetterAPIOptions,
+  registerOpenApiRoute,
+  setGlobalOpenApiOptions,
+} from '@/core/openapi'
 import { JsonResponse } from '@/core/response'
 import type { HttpMethod } from '@/types/common'
 import type {
@@ -75,6 +79,12 @@ export interface RouteConfig<
 
 export class BetterAPI {
   private instance = new Hono()
+
+  constructor(options?: BetterAPIOptions) {
+    if (options) {
+      setGlobalOpenApiOptions(options)
+    }
+  }
 
   getInstance() {
     return this.instance

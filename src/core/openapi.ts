@@ -10,13 +10,20 @@ import 'zod-openapi'
 import type { StatusCode } from 'hono/utils/http-status'
 import {
   type ZodOpenApiResponsesObject as _ZodOpenApiResponsesObject,
+  type CreateDocumentOptions,
   createDocument,
+  type ZodOpenApiObject,
   type ZodOpenApiOperationObject,
   type ZodOpenApiParameters,
   type ZodOpenApiPathsObject,
   type ZodOpenApiRequestBodyObject,
 } from 'zod-openapi'
 import { convertExpressPathToOpenAPI } from '@/utils/openapi'
+
+export interface BetterAPIOptions {
+  openapi?: Partial<Omit<ZodOpenApiObject, 'paths'>>
+  createDocumentOptions?: CreateDocumentOptions
+}
 
 interface OpenApiRoute {
   path: string
@@ -38,9 +45,14 @@ interface OpenApiRoute {
 }
 
 const globalRoutes: OpenApiRoute[] = []
+let globalOpenApiOptions: BetterAPIOptions = {}
 
 export function registerOpenApiRoute(route: OpenApiRoute) {
   globalRoutes.push(route)
+}
+
+export function setGlobalOpenApiOptions(options: BetterAPIOptions) {
+  globalOpenApiOptions = options
 }
 
 let globalResponses: BetterApiResponses = {}
@@ -65,14 +77,20 @@ export function generateOpenAPI() {
     paths[path] = { ...paths[path], ...pathOperation }
   }
 
-  return createDocument({
+  const mergedConfig: ZodOpenApiObject = {
     openapi: '3.1.0',
     info: {
       title: 'API',
       version: '1.0.0',
     },
     paths,
-  })
+    ...globalOpenApiOptions.openapi,
+  }
+
+  return createDocument(
+    mergedConfig,
+    globalOpenApiOptions.createDocumentOptions,
+  )
 }
 
 function createZodOpenApiPath(route: OpenApiRoute) {
