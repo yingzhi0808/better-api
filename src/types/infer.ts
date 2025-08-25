@@ -1,7 +1,8 @@
 import type { Cookie } from 'hono/utils/cookie'
 import type { RequestHeader } from 'hono/utils/headers'
 import type { StatusCode } from 'hono/utils/http-status'
-import type { ZodArray, ZodFile, ZodObject, ZodType, z } from 'zod'
+import type z from 'zod'
+import type { ZodArray, ZodFile, ZodObject, ZodType } from 'zod'
 import type {
   BetterApiResponses,
   SimplifiedZodOpenApiResponseObject,

@@ -14,6 +14,7 @@ import {
 } from '@/core/di'
 import {
   type BetterAPIOptions,
+  globalOpenApiOptions,
   registerOpenApiRoute,
   setGlobalOpenApiOptions,
 } from '@/core/openapi'
@@ -35,9 +36,9 @@ import type {
   ZodOpenApiResponsesObject,
 } from '@/types/response'
 import { normalizeZodOpenApiResponses } from '@/utils/response'
-import { isZodType } from '@/utils/zod'
+import { isZodType, mergeZodObjects } from '@/utils/zod'
 
-export type HandlerReturnType<Responses> =
+export type HandlerResponse<Responses> =
   | Response
   | InferAllResponses<Responses>
   | Promise<InferAllResponses<Responses> | Response>
@@ -77,10 +78,22 @@ export interface RouteConfig<
   deprecated?: boolean
 }
 
-export class BetterAPI {
+export class BetterAPI<
+  GlobalParams extends ZodObject,
+  GlobalQuery extends ZodObject,
+  GlobalHeaders extends ZodObject,
+  GlobalCookies extends ZodObject,
+> {
   private instance = new Hono()
 
-  constructor(options?: BetterAPIOptions) {
+  constructor(
+    options?: BetterAPIOptions<
+      GlobalParams,
+      GlobalQuery,
+      GlobalHeaders,
+      GlobalCookies
+    >,
+  ) {
     if (options) {
       setGlobalOpenApiOptions(options)
     }
@@ -114,17 +127,17 @@ export class BetterAPI {
     handler: (
       context: Context<
         Responses,
-        Params,
-        Query,
-        Headers,
-        Cookies,
+        Params & GlobalParams,
+        Query & GlobalQuery,
+        Headers & GlobalHeaders,
+        Cookies & GlobalCookies,
         Body,
         Form,
         File,
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Responses>,
+    ) => HandlerResponse<Responses>,
     options?: RouteConfig<
       Responses,
       Params,
@@ -159,15 +172,23 @@ export class BetterAPI {
       deprecated: options?.deprecated,
     })
 
-    const wrapper: Handler = async (c) => {
+    const globalRequestParams = globalOpenApiOptions.globalRequestParams
+
+    const wrapper: Handler = (c) => {
       return runWithRequestScope(async () => {
         const rawParams = c.req.param()
         let typedParams: Record<string, string> | Record<string, unknown> =
           rawParams
 
-        if (options?.params) {
+        // 合并全局参数和路由特定参数进行校验
+        const mergedParamsSchema = mergeZodObjects(
+          globalRequestParams?.params,
+          options?.params,
+        )
+
+        if (mergedParamsSchema) {
           const { success, data, error } =
-            await options.params.safeParseAsync(rawParams)
+            await mergedParamsSchema.safeParseAsync(rawParams)
           if (!success) {
             throw new HTTPException(400, { cause: error })
           }
@@ -185,9 +206,15 @@ export class BetterAPI {
           | Record<string, string | string[]>
           | Record<string, unknown> = rawQuery
 
-        if (options?.query) {
+        // 合并全局查询参数和路由特定查询参数进行校验
+        const mergedQuerySchema = mergeZodObjects(
+          globalRequestParams?.query,
+          options?.query,
+        )
+
+        if (mergedQuerySchema) {
           const { success, data, error } =
-            await options.query.safeParseAsync(rawQuery)
+            await mergedQuerySchema.safeParseAsync(rawQuery)
           if (!success) {
             throw new HTTPException(400, { cause: error })
           }
@@ -199,9 +226,15 @@ export class BetterAPI {
           | Record<RequestHeader, string>
           | Record<string, unknown> = rawHeaders
 
-        if (options?.headers) {
+        // 合并全局请求头参数和路由特定请求头参数进行校验
+        const mergedHeadersSchema = mergeZodObjects(
+          globalRequestParams?.headers,
+          options?.headers,
+        )
+
+        if (mergedHeadersSchema) {
           const { success, data, error } =
-            await options.headers.safeParseAsync(rawHeaders)
+            await mergedHeadersSchema.safeParseAsync(rawHeaders)
           if (!success) {
             throw new HTTPException(400, { cause: error })
           }
@@ -214,9 +247,15 @@ export class BetterAPI {
         const rawCookies = getCookie(c)
         let typedCookies: Cookie | Record<string, unknown> = rawCookies
 
-        if (options?.cookies) {
+        // 合并全局 Cookie 参数和路由特定 Cookie 参数进行校验
+        const mergedCookiesSchema = mergeZodObjects(
+          globalRequestParams?.cookies,
+          options?.cookies,
+        )
+
+        if (mergedCookiesSchema) {
           const { success, data, error } =
-            await options.cookies.safeParseAsync(rawCookies)
+            await mergedCookiesSchema.safeParseAsync(rawCookies)
           if (!success) {
             throw new HTTPException(400, { cause: error })
           }
@@ -293,18 +332,7 @@ export class BetterAPI {
           depsObject = Object.fromEntries(entries) as Provided<Dependencies>
         }
 
-        const context = new Context<
-          Response,
-          Params,
-          Query,
-          Headers,
-          Cookies,
-          Body,
-          Form,
-          File,
-          Files,
-          Dependencies
-        >(
+        const context = new Context(
           c,
           typedParams as InferParams<Params>,
           typedQuery as InferQuery<Query>,
@@ -400,17 +428,17 @@ export class BetterAPI {
     handler: (
       context: Context<
         Responses,
-        Params,
-        Query,
-        Headers,
-        Cookies,
+        Params & GlobalParams,
+        Query & GlobalQuery,
+        Headers & GlobalHeaders,
+        Cookies & GlobalCookies,
         Body,
         Form,
         File,
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Responses>,
+    ) => HandlerResponse<Responses>,
     options?: RouteConfig<
       Responses,
       Params,
@@ -445,17 +473,17 @@ export class BetterAPI {
     handler: (
       context: Context<
         Responses,
-        Params,
-        Query,
-        Headers,
-        Cookies,
+        Params & GlobalParams,
+        Query & GlobalQuery,
+        Headers & GlobalHeaders,
+        Cookies & GlobalCookies,
         Body,
         Form,
         File,
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Responses>,
+    ) => HandlerResponse<Responses>,
     options?: RouteConfig<
       Responses,
       Params,
@@ -490,17 +518,17 @@ export class BetterAPI {
     handler: (
       context: Context<
         Responses,
-        Params,
-        Query,
-        Headers,
-        Cookies,
+        Params & GlobalParams,
+        Query & GlobalQuery,
+        Headers & GlobalHeaders,
+        Cookies & GlobalCookies,
         Body,
         Form,
         File,
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Responses>,
+    ) => HandlerResponse<Responses>,
     options?: RouteConfig<
       Responses,
       Params,
@@ -535,17 +563,17 @@ export class BetterAPI {
     handler: (
       context: Context<
         Responses,
-        Params,
-        Query,
-        Headers,
-        Cookies,
+        Params & GlobalParams,
+        Query & GlobalQuery,
+        Headers & GlobalHeaders,
+        Cookies & GlobalCookies,
         Body,
         Form,
         File,
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Responses>,
+    ) => HandlerResponse<Responses>,
     options?: RouteConfig<
       Responses,
       Params,
@@ -580,17 +608,17 @@ export class BetterAPI {
     handler: (
       context: Context<
         Responses,
-        Params,
-        Query,
-        Headers,
-        Cookies,
+        Params & GlobalParams,
+        Query & GlobalQuery,
+        Headers & GlobalHeaders,
+        Cookies & GlobalCookies,
         Body,
         Form,
         File,
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Responses>,
+    ) => HandlerResponse<Responses>,
     options?: RouteConfig<
       Responses,
       Params,
@@ -625,17 +653,17 @@ export class BetterAPI {
     handler: (
       context: Context<
         Responses,
-        Params,
-        Query,
-        Headers,
-        Cookies,
+        Params & GlobalParams,
+        Query & GlobalQuery,
+        Headers & GlobalHeaders,
+        Cookies & GlobalCookies,
         Body,
         Form,
         File,
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Responses>,
+    ) => HandlerResponse<Responses>,
     options?: RouteConfig<
       Responses,
       Params,
@@ -670,17 +698,17 @@ export class BetterAPI {
     handler: (
       context: Context<
         Responses,
-        Params,
-        Query,
-        Headers,
-        Cookies,
+        Params & GlobalParams,
+        Query & GlobalQuery,
+        Headers & GlobalHeaders,
+        Cookies & GlobalCookies,
         Body,
         Form,
         File,
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Responses>,
+    ) => HandlerResponse<Responses>,
     options?: RouteConfig<
       Responses,
       Params,
@@ -715,17 +743,17 @@ export class BetterAPI {
     handler: (
       context: Context<
         Responses,
-        Params,
-        Query,
-        Headers,
-        Cookies,
+        Params & GlobalParams,
+        Query & GlobalQuery,
+        Headers & GlobalHeaders,
+        Cookies & GlobalCookies,
         Body,
         Form,
         File,
         Files,
         Dependencies
       >,
-    ) => HandlerReturnType<Responses>,
+    ) => HandlerResponse<Responses>,
     options?: RouteConfig<
       Responses,
       Params,

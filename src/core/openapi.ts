@@ -1,13 +1,14 @@
 import http from 'node:http'
+import type { StatusCode } from 'hono/utils/http-status'
 import z, { type ZodArray, ZodFile, type ZodObject, type ZodType } from 'zod'
 import type {
   BetterApiResponse,
   BetterApiResponses,
   ZodOpenApiResponsesObject,
 } from '@/types/response'
+import { convertExpressPathToOpenAPI } from '@/utils/openapi'
 import { normalizeZodOpenApiResponses } from '@/utils/response'
 import 'zod-openapi'
-import type { StatusCode } from 'hono/utils/http-status'
 import {
   type ZodOpenApiResponsesObject as _ZodOpenApiResponsesObject,
   type CreateDocumentOptions,
@@ -18,11 +19,21 @@ import {
   type ZodOpenApiPathsObject,
   type ZodOpenApiRequestBodyObject,
 } from 'zod-openapi'
-import { convertExpressPathToOpenAPI } from '@/utils/openapi'
 
-export interface BetterAPIOptions {
+export interface BetterAPIOptions<
+  GlobalParams extends ZodObject,
+  GlobalQuery extends ZodObject,
+  GlobalHeaders extends ZodObject,
+  GlobalCookies extends ZodObject,
+> {
   openapi?: Partial<Omit<ZodOpenApiObject, 'paths'>>
   createDocumentOptions?: CreateDocumentOptions
+  globalRequestParams?: {
+    params?: GlobalParams
+    query?: GlobalQuery
+    headers?: GlobalHeaders
+    cookies?: GlobalCookies
+  }
 }
 
 interface OpenApiRoute {
@@ -45,13 +56,20 @@ interface OpenApiRoute {
 }
 
 const globalRoutes: OpenApiRoute[] = []
-let globalOpenApiOptions: BetterAPIOptions = {}
+export let globalOpenApiOptions: BetterAPIOptions<
+  ZodObject,
+  ZodObject,
+  ZodObject,
+  ZodObject
+> = {}
 
 export function registerOpenApiRoute(route: OpenApiRoute) {
   globalRoutes.push(route)
 }
 
-export function setGlobalOpenApiOptions(options: BetterAPIOptions) {
+export function setGlobalOpenApiOptions(
+  options: BetterAPIOptions<ZodObject, ZodObject, ZodObject, ZodObject>,
+) {
   globalOpenApiOptions = options
 }
 
@@ -61,6 +79,48 @@ export function setGlobalResponses(
   responses: Partial<Record<StatusCode, BetterApiResponse>>,
 ) {
   globalResponses = responses
+}
+
+// 全局默认请求参数泛型接口
+export interface GlobalRequestParams {
+  /** 全局路径参数 */
+  params?: ZodObject
+  /** 全局查询参数 */
+  query?: ZodObject
+  /** 全局请求头参数 */
+  headers?: ZodObject
+  /** 全局 Cookie 参数 */
+  cookies?: ZodObject
+}
+
+/**
+ * 合并全局请求参数和路由特定参数
+ */
+function mergeRequestParams(route: OpenApiRoute) {
+  const mergedParams = {
+    params: {
+      ...globalOpenApiOptions.globalRequestParams?.params,
+      ...route.params,
+    },
+    query: {
+      ...globalOpenApiOptions.globalRequestParams?.query,
+      ...route.query,
+    },
+    headers: {
+      ...globalOpenApiOptions.globalRequestParams?.headers,
+      ...route.headers,
+    },
+    cookies: {
+      ...globalOpenApiOptions.globalRequestParams?.cookies,
+      ...route.cookies,
+    },
+    body: route.body,
+    form: route.form,
+    file: route.file,
+    files: route.files,
+  }
+
+  return mergedParams
 }
 
 export function generateOpenAPI() {
@@ -73,8 +133,8 @@ export function generateOpenAPI() {
       paths[path] = {}
     }
 
-    const pathOperation = createZodOpenApiPath(route)
-    paths[path] = { ...paths[path], ...pathOperation }
+    const pathItem = createZodOpenApiPathItem(route)
+    paths[path] = { ...paths[path], ...pathItem }
   }
 
   const mergedConfig: ZodOpenApiObject = {
@@ -93,38 +153,31 @@ export function generateOpenAPI() {
   )
 }
 
-function createZodOpenApiPath(route: OpenApiRoute) {
+function createZodOpenApiPathItem(route: OpenApiRoute) {
+  const mergedParams = mergeRequestParams(route)
   const requestParams: ZodOpenApiParameters = {}
-  if (route.params) {
-    requestParams.path = route.params
-  }
-  if (route.query) {
-    requestParams.query = route.query
-  }
-  if (route.headers) {
-    requestParams.header = route.headers
-  }
-  if (route.cookies) {
-    requestParams.cookie = route.cookies
-  }
 
   let requestBody: ZodOpenApiRequestBodyObject | undefined
-  if (route.body) {
+  if (mergedParams.body) {
     requestBody = {
       content: {
-        'application/json': { schema: route.body },
+        'application/json': { schema: mergedParams.body },
       },
     }
-  } else if (route.form) {
-    const hasFile = Object.values(route.form.shape).some(
+  } else if (mergedParams.form) {
+    const hasFile = Object.values(mergedParams.form.shape).some(
       (v) => v instanceof ZodFile,
     )
     requestBody = {
       content: {
-        'multipart/form-data': { schema: route.form },
+        'multipart/form-data': { schema: mergedParams.form },
         ...(hasFile
           ? {}
-          : { 'application/x-www-form-urlencoded': { schema: route.form } }),
+          : {
+              'application/x-www-form-urlencoded': {
+                schema: mergedParams.form,
+              },
+            }),
       },
     }
   } else if (route.file) {

@@ -1,4 +1,4 @@
-import type { Context as HonoCtx } from 'hono'
+import type { Context as HonoContext } from 'hono'
 import type { Provider } from '@/core/di'
 import { HtmlResponse, JsonResponse, TextResponse } from '@/core/response'
 import type { Provided } from '@/hono/api'
@@ -29,7 +29,7 @@ export class Context<
   Dependencies extends Record<string, Provider<unknown>> | undefined,
 > {
   constructor(
-    public readonly hono: HonoCtx,
+    public readonly hono: HonoContext,
     public readonly params: InferParams<Params>,
     public readonly query: InferQuery<Query>,
     public readonly headers: InferHeaders<Headers>,
