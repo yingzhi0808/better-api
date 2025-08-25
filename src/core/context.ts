@@ -1,7 +1,7 @@
 import type { Context as HonoContext } from 'hono'
+import type { Provided } from '@/core/api'
 import type { Provider } from '@/core/di'
 import { HtmlResponse, JsonResponse, TextResponse } from '@/core/response'
-import type { Provided } from '@/hono/api'
 import type {
   InferBody,
   InferCookies,
