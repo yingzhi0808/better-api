@@ -35,6 +35,7 @@ import type {
   ResponsesDefinition,
   ZodOpenApiResponsesObject,
 } from '@/types/response'
+import type { ValidationErrors } from '@/types/zod'
 import { normalizeZodOpenApiResponses } from '@/utils/response'
 import { isZodType, mergeZodObjects } from '@/utils/zod'
 
@@ -196,6 +197,8 @@ export class BetterAPI<
 
     const wrapper: Handler = (c) => {
       return runWithRequestScope(async () => {
+        const validationErrors: ValidationErrors = {}
+
         const rawParams = c.req.param()
         let typedParams: Record<string, string> | Record<string, unknown> =
           rawParams
@@ -203,10 +206,11 @@ export class BetterAPI<
         if (mergedParams) {
           const { success, data, error } =
             await mergedParams.safeParseAsync(rawParams)
-          if (!success) {
-            throw new HTTPException(400, { cause: error })
+          if (success) {
+            typedParams = data
+          } else {
+            validationErrors.params = error.issues
           }
-          typedParams = data
         }
 
         const rawQueries = c.req.queries()
@@ -223,10 +227,12 @@ export class BetterAPI<
         if (mergedQuery) {
           const { success, data, error } =
             await mergedQuery.safeParseAsync(rawQuery)
-          if (!success) {
-            throw new HTTPException(400, { cause: error })
+
+          if (success) {
+            typedQuery = data
+          } else {
+            validationErrors.query = error.issues
           }
-          typedQuery = data
         }
 
         const rawHeaders = c.req.header()
@@ -237,12 +243,10 @@ export class BetterAPI<
         if (mergedHeaders) {
           const { success, data, error } =
             await mergedHeaders.safeParseAsync(rawHeaders)
-          if (!success) {
-            throw new HTTPException(400, { cause: error })
-          }
-          typedHeaders = {
-            ...rawHeaders,
-            ...data,
+          if (success) {
+            typedHeaders = data
+          } else {
+            validationErrors.headers = error.issues
           }
         }
 
@@ -252,10 +256,11 @@ export class BetterAPI<
         if (mergedCookies) {
           const { success, data, error } =
             await mergedCookies.safeParseAsync(rawCookies)
-          if (!success) {
-            throw new HTTPException(400, { cause: error })
+          if (success) {
+            typedCookies = data
+          } else {
+            validationErrors.cookies = error.issues
           }
-          typedCookies = data
         }
 
         let typedBody: unknown | undefined
@@ -264,10 +269,11 @@ export class BetterAPI<
           const rawBody = await c.req.json()
           const { success, data, error } =
             await options.body.safeParseAsync(rawBody)
-          if (!success) {
-            throw new HTTPException(400, { cause: error })
+          if (success) {
+            typedBody = data
+          } else {
+            validationErrors.body = error.issues
           }
-          typedBody = data
         }
 
         let typedForm: unknown | undefined
@@ -276,10 +282,11 @@ export class BetterAPI<
           const rawForm = await c.req.parseBody({ all: true })
           const { success, data, error } =
             await options.form.safeParseAsync(rawForm)
-          if (!success) {
-            throw new HTTPException(400, { cause: error })
+          if (success) {
+            typedForm = data
+          } else {
+            validationErrors.form = error.issues
           }
-          typedForm = data
         }
 
         let typedFile: unknown | undefined
@@ -289,10 +296,11 @@ export class BetterAPI<
           const rawFile = rawForm.file
           const { success, data, error } =
             await options.file.safeParseAsync(rawFile)
-          if (!success) {
-            throw new HTTPException(400, { cause: error })
+          if (success) {
+            typedFile = data
+          } else {
+            validationErrors.file = error.issues
           }
-          typedFile = data
         }
 
         let typedFiles: unknown | undefined
@@ -304,10 +312,17 @@ export class BetterAPI<
             : [rawForm.files]
           const { success, data, error } =
             await options.files.safeParseAsync(rawFiles)
-          if (!success) {
-            throw new HTTPException(400, { cause: error })
+          if (success) {
+            typedFiles = data
+          } else {
+            validationErrors.files = error.issues
           }
-          typedFiles = data
+        }
+
+        if (Object.keys(validationErrors).length > 0) {
+          throw new HTTPException(400, {
+            res: new JsonResponse(validationErrors, 400),
+          })
         }
 
         // dependencies
@@ -369,7 +384,10 @@ export class BetterAPI<
                 return new JsonResponse(data, statusCode)
               }
 
-              throw new HTTPException(500, { cause: error })
+              throw new HTTPException(500, {
+                cause: error,
+                message: 'Internal Server Error',
+              })
             }
           }
         }
