@@ -1,6 +1,12 @@
-import { type Handler, Hono, type Context as HonoCtx } from 'hono'
+import {
+  type ErrorHandler,
+  type Handler,
+  Hono,
+  type Context as HonoContext,
+} from 'hono'
 import { getCookie } from 'hono/cookie'
 import { HTTPException } from 'hono/http-exception'
+import type { HTTPResponseError } from 'hono/types'
 import type { Cookie } from 'hono/utils/cookie'
 import type { RequestHeader } from 'hono/utils/headers'
 import type { StatusCode } from 'hono/utils/http-status'
@@ -16,6 +22,7 @@ import {
 import { registerOpenApiRoute } from '@/core/openapi'
 import { JSONResponse } from '@/core/response'
 import type { HttpMethod } from '@/types/common'
+import type { ErrorHandlerMap } from '@/types/error'
 import type {
   InferAllResponses,
   InferBody,
@@ -100,6 +107,15 @@ export let globalOpenApiOptions: BetterAPIOptions<
   ZodObject
 > = {}
 
+const errorHandler = (err: Error | HTTPResponseError, c: HonoContext) => {
+  if ('getResponse' in err) {
+    const res = err.getResponse()
+    return c.newResponse(res.body, res)
+  }
+  console.error(err)
+  return c.text('Internal Server Error', 500)
+}
+
 export class BetterAPI<
   GlobalParams extends ZodObject,
   GlobalQuery extends ZodObject,
@@ -107,6 +123,7 @@ export class BetterAPI<
   GlobalCookies extends ZodObject,
 > {
   private instance = new Hono()
+  private errorHandlers: ErrorHandlerMap = new Map()
 
   constructor(
     options?: BetterAPIOptions<
@@ -119,6 +136,8 @@ export class BetterAPI<
     if (options) {
       globalOpenApiOptions = options
     }
+
+    this.setupErrorHandler()
   }
 
   getInstance() {
@@ -128,6 +147,47 @@ export class BetterAPI<
   use(...args: Parameters<Hono['use']>) {
     const u = this.instance.use.bind(this.instance)
     u(...args)
+  }
+
+  /**
+   * 注册自定义错误处理器
+   * @param errorType 错误构造函数
+   * @param handler 错误处理器函数
+   */
+  registerErrorHandler<T extends Error>(
+    errorType: new (...args: unknown[]) => T,
+    handler: ErrorHandler,
+  ) {
+    this.errorHandlers.set(errorType, handler)
+  }
+
+  /**
+   * 查找匹配的错误处理器
+   * @param error 错误实例
+   * @returns 匹配的错误处理器和优先级
+   */
+  private findErrorHandler(error: Error) {
+    for (const [errorType, handler] of this.errorHandlers) {
+      if (error instanceof errorType) {
+        return handler
+      }
+    }
+
+    return null
+  }
+
+  /**
+   * 设置自定义错误处理中间件
+   */
+  private setupErrorHandler() {
+    this.instance.onError((error, c) => {
+      const handler = this.findErrorHandler(error)
+      if (handler) {
+        return handler(error, c)
+      }
+
+      return errorHandler(error, c)
+    })
   }
 
   private registerRoute<
@@ -350,7 +410,7 @@ export class BetterAPI<
         let depsObject: Provided<Dependencies> =
           undefined as Provided<Dependencies>
         if (options?.dependencies) {
-          const makeCtx = (hono: HonoCtx): ProviderContext => {
+          const makeCtx = (hono: HonoContext): ProviderContext => {
             const ctx: ProviderContext = {
               hono,
               get: <T>(prov: Provider<T>) => resolveProvider(prov, ctx),
