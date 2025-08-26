@@ -18,7 +18,7 @@ import {
   registerOpenApiRoute,
   setGlobalOpenApiOptions,
 } from '@/core/openapi'
-import { JsonResponse } from '@/core/response'
+import { JSONResponse } from '@/core/response'
 import type { HttpMethod } from '@/types/common'
 import type {
   InferAllResponses,
@@ -321,7 +321,7 @@ export class BetterAPI<
 
         if (Object.keys(validationErrors).length > 0) {
           throw new HTTPException(400, {
-            res: new JsonResponse(validationErrors, 400),
+            res: new JSONResponse(validationErrors, 400),
           })
         }
 
@@ -360,15 +360,15 @@ export class BetterAPI<
 
         if (responses) {
           const shouldValidate =
-            result instanceof JsonResponse || !(result instanceof Response)
+            result instanceof JSONResponse || !(result instanceof Response)
 
           if (shouldValidate) {
             const responseData =
-              result instanceof JsonResponse
+              result instanceof JSONResponse
                 ? await result.clone().json()
                 : result
             const statusCode =
-              result instanceof JsonResponse
+              result instanceof JSONResponse
                 ? (result.status as StatusCode)
                 : 200
 
@@ -381,7 +381,7 @@ export class BetterAPI<
               const { success, data, error } =
                 await validationSchema.safeParseAsync(responseData)
               if (success) {
-                return new JsonResponse(data, statusCode)
+                return new JSONResponse(data, statusCode)
               }
 
               throw new HTTPException(500, {

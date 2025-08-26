@@ -1,7 +1,7 @@
 import type { Context as HonoContext } from 'hono'
 import type { Provided } from '@/core/api'
 import type { Provider } from '@/core/di'
-import { HtmlResponse, JsonResponse, TextResponse } from '@/core/response'
+import { HTMLResponse, JSONResponse, TextResponse } from '@/core/response'
 import type {
   InferBody,
   InferCookies,
@@ -44,23 +44,23 @@ export class Context<
   json<
     Data extends InferResponse<Responses, Status>,
     const Status extends 200 = 200,
-  >(data: Data): JsonResponse<Data, Status>
+  >(data: Data): JSONResponse<Data, Status>
   json<
     Data extends InferResponse<Responses, Status>,
     const Status extends InferStatus<Responses>,
-  >(data: Data, statusOrInit: StatusOrInit<Status>): JsonResponse<Data, Status>
+  >(data: Data, statusOrInit: StatusOrInit<Status>): JSONResponse<Data, Status>
   json<
     Data extends InferResponse<Responses, Status>,
     const Status extends InferStatus<Responses>,
   >(data: Data, statusOrInit?: StatusOrInit<Status>) {
-    return new JsonResponse(data, statusOrInit)
+    return new JSONResponse(data, statusOrInit)
   }
 
   html<Data extends string, const Status extends InferStatus<Responses>>(
     data: Data,
     statusOrInit?: StatusOrInit<Status>,
   ) {
-    return new HtmlResponse(data, statusOrInit)
+    return new HTMLResponse(data, statusOrInit)
   }
 
   text<Data extends string, const Status extends InferStatus<Responses>>(

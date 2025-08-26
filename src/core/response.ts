@@ -4,7 +4,7 @@ export type StatusOrInit<Status extends StatusCode> =
   | Status
   | (ResponseInit & { status?: Status })
 
-export class JsonResponse<
+export class JSONResponse<
   const Body,
   const Status extends StatusCode = 200,
 > extends Response {
@@ -23,7 +23,7 @@ export class JsonResponse<
   }
 }
 
-export class HtmlResponse<
+export class HTMLResponse<
   const Body extends string,
   const Status extends StatusCode = 200,
 > extends Response {
