@@ -3,7 +3,6 @@ import type { StatusCode } from 'hono/utils/http-status'
 import z, { type ZodArray, ZodFile, type ZodObject, type ZodType } from 'zod'
 import type {
   BetterApiResponse,
-  BetterApiResponses,
   ZodOpenApiResponsesObject,
 } from '@/types/response'
 import { convertExpressPathToOpenAPI } from '@/utils/openapi'
@@ -34,6 +33,7 @@ export interface BetterAPIOptions<
     headers?: GlobalHeaders
     cookies?: GlobalCookies
   }
+  globalResponses?: Partial<Record<StatusCode, BetterApiResponse>>
 }
 
 interface OpenApiRoute {
@@ -71,14 +71,6 @@ export function setGlobalOpenApiOptions(
   options: BetterAPIOptions<ZodObject, ZodObject, ZodObject, ZodObject>,
 ) {
   globalOpenApiOptions = options
-}
-
-let globalResponses: BetterApiResponses = {}
-
-export function setGlobalResponses(
-  responses: Partial<Record<StatusCode, BetterApiResponse>>,
-) {
-  globalResponses = responses
 }
 
 // 全局默认请求参数泛型接口
@@ -195,8 +187,9 @@ function createZodOpenApiPathItem(route: OpenApiRoute) {
   }
 
   const responses: _ZodOpenApiResponsesObject = {}
-  let normalizedGlobalResponses =
-    normalizeZodOpenApiResponses(globalResponses) ?? {}
+  let normalizedGlobalResponses = normalizeZodOpenApiResponses(
+    globalOpenApiOptions.globalResponses ?? {},
+  )
   if (route.responses) {
     normalizedGlobalResponses = {
       ...normalizedGlobalResponses,
