@@ -1,16 +1,11 @@
 import http from 'node:http'
-import type { StatusCode } from 'hono/utils/http-status'
 import z, { type ZodArray, ZodFile, type ZodObject, type ZodType } from 'zod'
-import type {
-  BetterApiResponse,
-  ZodOpenApiResponsesObject,
-} from '@/types/response'
+import type { ZodOpenApiResponsesObject } from '@/types/response'
 import { convertExpressPathToOpenAPI } from '@/utils/openapi'
 import { normalizeZodOpenApiResponses } from '@/utils/response'
 import 'zod-openapi'
 import {
   type ZodOpenApiResponsesObject as _ZodOpenApiResponsesObject,
-  type CreateDocumentOptions,
   createDocument,
   type ZodOpenApiObject,
   type ZodOpenApiOperationObject,
@@ -18,23 +13,7 @@ import {
   type ZodOpenApiPathsObject,
   type ZodOpenApiRequestBodyObject,
 } from 'zod-openapi'
-
-export interface BetterAPIOptions<
-  GlobalParams extends ZodObject,
-  GlobalQuery extends ZodObject,
-  GlobalHeaders extends ZodObject,
-  GlobalCookies extends ZodObject,
-> {
-  openapi?: Partial<Omit<ZodOpenApiObject, 'paths'>>
-  createDocumentOptions?: CreateDocumentOptions
-  globalRequestParams?: {
-    params?: GlobalParams
-    query?: GlobalQuery
-    headers?: GlobalHeaders
-    cookies?: GlobalCookies
-  }
-  globalResponses?: Partial<Record<StatusCode, BetterApiResponse>>
-}
+import { globalOpenApiOptions } from './api'
 
 interface OpenApiRoute {
   path: string
@@ -55,25 +34,6 @@ interface OpenApiRoute {
   deprecated?: boolean
 }
 
-const globalRoutes: OpenApiRoute[] = []
-export let globalOpenApiOptions: BetterAPIOptions<
-  ZodObject,
-  ZodObject,
-  ZodObject,
-  ZodObject
-> = {}
-
-export function registerOpenApiRoute(route: OpenApiRoute) {
-  globalRoutes.push(route)
-}
-
-export function setGlobalOpenApiOptions(
-  options: BetterAPIOptions<ZodObject, ZodObject, ZodObject, ZodObject>,
-) {
-  globalOpenApiOptions = options
-}
-
-// 全局默认请求参数泛型接口
 export interface GlobalRequestParams {
   /** 全局路径参数 */
   params?: ZodObject
@@ -83,6 +43,12 @@ export interface GlobalRequestParams {
   headers?: ZodObject
   /** 全局 Cookie 参数 */
   cookies?: ZodObject
+}
+
+const globalRoutes: OpenApiRoute[] = []
+
+export function registerOpenApiRoute(route: OpenApiRoute) {
+  globalRoutes.push(route)
 }
 
 export function generateOpenAPI() {

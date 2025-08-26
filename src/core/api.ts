@@ -5,6 +5,7 @@ import type { Cookie } from 'hono/utils/cookie'
 import type { RequestHeader } from 'hono/utils/headers'
 import type { StatusCode } from 'hono/utils/http-status'
 import type { ZodArray, ZodFile, ZodObject, ZodType } from 'zod'
+import type { CreateDocumentOptions, ZodOpenApiObject } from 'zod-openapi'
 import { Context } from '@/core/context'
 import {
   type Provider,
@@ -12,12 +13,7 @@ import {
   resolveProvider,
   runWithRequestScope,
 } from '@/core/di'
-import {
-  type BetterAPIOptions,
-  globalOpenApiOptions,
-  registerOpenApiRoute,
-  setGlobalOpenApiOptions,
-} from '@/core/openapi'
+import { registerOpenApiRoute } from '@/core/openapi'
 import { JSONResponse } from '@/core/response'
 import type { HttpMethod } from '@/types/common'
 import type {
@@ -32,6 +28,7 @@ import type {
   InferQuery,
 } from '@/types/infer'
 import type {
+  BetterApiResponse,
   ResponsesDefinition,
   ZodOpenApiResponsesObject,
 } from '@/types/response'
@@ -79,6 +76,30 @@ export interface RouteConfig<
   deprecated?: boolean
 }
 
+export interface BetterAPIOptions<
+  GlobalParams extends ZodObject,
+  GlobalQuery extends ZodObject,
+  GlobalHeaders extends ZodObject,
+  GlobalCookies extends ZodObject,
+> {
+  openapi?: Partial<Omit<ZodOpenApiObject, 'paths'>>
+  createDocumentOptions?: CreateDocumentOptions
+  globalRequestParams?: {
+    params?: GlobalParams
+    query?: GlobalQuery
+    headers?: GlobalHeaders
+    cookies?: GlobalCookies
+  }
+  globalResponses?: Partial<Record<StatusCode, BetterApiResponse>>
+}
+
+export let globalOpenApiOptions: BetterAPIOptions<
+  ZodObject,
+  ZodObject,
+  ZodObject,
+  ZodObject
+> = {}
+
 export class BetterAPI<
   GlobalParams extends ZodObject,
   GlobalQuery extends ZodObject,
@@ -96,7 +117,7 @@ export class BetterAPI<
     >,
   ) {
     if (options) {
-      setGlobalOpenApiOptions(options)
+      globalOpenApiOptions = options
     }
   }
 
