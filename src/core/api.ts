@@ -153,14 +153,36 @@ export class BetterAPI<
   ) {
     const responses = normalizeZodOpenApiResponses(options?.responses ?? {})
 
+    const globalRequestParams = globalOpenApiOptions.globalRequestParams
+
+    const mergedParams = mergeZodObjects(
+      globalRequestParams?.params,
+      options?.params,
+    )
+
+    const mergedQuery = mergeZodObjects(
+      globalRequestParams?.query,
+      options?.query,
+    )
+
+    const mergedHeaders = mergeZodObjects(
+      globalRequestParams?.headers,
+      options?.headers,
+    )
+
+    const mergedCookies = mergeZodObjects(
+      globalRequestParams?.cookies,
+      options?.cookies,
+    )
+
     registerOpenApiRoute({
       path,
       method,
       responses,
-      params: options?.params,
-      query: options?.query,
-      headers: options?.headers,
-      cookies: options?.cookies,
+      params: mergedParams,
+      query: mergedQuery,
+      headers: mergedHeaders,
+      cookies: mergedCookies,
       body: options?.body,
       form: options?.form,
       file: options?.file,
@@ -172,23 +194,15 @@ export class BetterAPI<
       deprecated: options?.deprecated,
     })
 
-    const globalRequestParams = globalOpenApiOptions.globalRequestParams
-
     const wrapper: Handler = (c) => {
       return runWithRequestScope(async () => {
         const rawParams = c.req.param()
         let typedParams: Record<string, string> | Record<string, unknown> =
           rawParams
 
-        // 合并全局参数和路由特定参数进行校验
-        const mergedParamsSchema = mergeZodObjects(
-          globalRequestParams?.params,
-          options?.params,
-        )
-
-        if (mergedParamsSchema) {
+        if (mergedParams) {
           const { success, data, error } =
-            await mergedParamsSchema.safeParseAsync(rawParams)
+            await mergedParams.safeParseAsync(rawParams)
           if (!success) {
             throw new HTTPException(400, { cause: error })
           }
@@ -206,15 +220,9 @@ export class BetterAPI<
           | Record<string, string | string[]>
           | Record<string, unknown> = rawQuery
 
-        // 合并全局查询参数和路由特定查询参数进行校验
-        const mergedQuerySchema = mergeZodObjects(
-          globalRequestParams?.query,
-          options?.query,
-        )
-
-        if (mergedQuerySchema) {
+        if (mergedQuery) {
           const { success, data, error } =
-            await mergedQuerySchema.safeParseAsync(rawQuery)
+            await mergedQuery.safeParseAsync(rawQuery)
           if (!success) {
             throw new HTTPException(400, { cause: error })
           }
@@ -226,15 +234,9 @@ export class BetterAPI<
           | Record<RequestHeader, string>
           | Record<string, unknown> = rawHeaders
 
-        // 合并全局请求头参数和路由特定请求头参数进行校验
-        const mergedHeadersSchema = mergeZodObjects(
-          globalRequestParams?.headers,
-          options?.headers,
-        )
-
-        if (mergedHeadersSchema) {
+        if (mergedHeaders) {
           const { success, data, error } =
-            await mergedHeadersSchema.safeParseAsync(rawHeaders)
+            await mergedHeaders.safeParseAsync(rawHeaders)
           if (!success) {
             throw new HTTPException(400, { cause: error })
           }
@@ -247,15 +249,9 @@ export class BetterAPI<
         const rawCookies = getCookie(c)
         let typedCookies: Cookie | Record<string, unknown> = rawCookies
 
-        // 合并全局 Cookie 参数和路由特定 Cookie 参数进行校验
-        const mergedCookiesSchema = mergeZodObjects(
-          globalRequestParams?.cookies,
-          options?.cookies,
-        )
-
-        if (mergedCookiesSchema) {
+        if (mergedCookies) {
           const { success, data, error } =
-            await mergedCookiesSchema.safeParseAsync(rawCookies)
+            await mergedCookies.safeParseAsync(rawCookies)
           if (!success) {
             throw new HTTPException(400, { cause: error })
           }

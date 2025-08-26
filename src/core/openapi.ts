@@ -85,36 +85,6 @@ export interface GlobalRequestParams {
   cookies?: ZodObject
 }
 
-/**
- * 合并全局请求参数和路由特定参数
- */
-function mergeRequestParams(route: OpenApiRoute) {
-  const mergedParams = {
-    params: {
-      ...globalOpenApiOptions.globalRequestParams?.params,
-      ...route.params,
-    },
-    query: {
-      ...globalOpenApiOptions.globalRequestParams?.query,
-      ...route.query,
-    },
-    headers: {
-      ...globalOpenApiOptions.globalRequestParams?.headers,
-      ...route.headers,
-    },
-    cookies: {
-      ...globalOpenApiOptions.globalRequestParams?.cookies,
-      ...route.cookies,
-    },
-    body: route.body,
-    form: route.form,
-    file: route.file,
-    files: route.files,
-  }
-
-  return mergedParams
-}
-
 export function generateOpenAPI() {
   const paths: ZodOpenApiPathsObject = {}
 
@@ -139,35 +109,52 @@ export function generateOpenAPI() {
     ...globalOpenApiOptions.openapi,
   }
 
-  return createDocument(
+  const document = createDocument(
     mergedConfig,
     globalOpenApiOptions.createDocumentOptions,
   )
+
+  return document
 }
 
 function createZodOpenApiPathItem(route: OpenApiRoute) {
-  const mergedParams = mergeRequestParams(route)
   const requestParams: ZodOpenApiParameters = {}
 
+  if (route.params) {
+    requestParams.path = route.params
+  }
+
+  if (route.query) {
+    requestParams.query = route.query
+  }
+
+  if (route.headers) {
+    requestParams.header = route.headers
+  }
+
+  if (route.cookies) {
+    requestParams.cookie = route.cookies
+  }
+
   let requestBody: ZodOpenApiRequestBodyObject | undefined
-  if (mergedParams.body) {
+  if (route.body) {
     requestBody = {
       content: {
-        'application/json': { schema: mergedParams.body },
+        'application/json': { schema: route.body },
       },
     }
-  } else if (mergedParams.form) {
-    const hasFile = Object.values(mergedParams.form.shape).some(
+  } else if (route.form) {
+    const hasFile = Object.values(route.form.shape).some(
       (v) => v instanceof ZodFile,
     )
     requestBody = {
       content: {
-        'multipart/form-data': { schema: mergedParams.form },
+        'multipart/form-data': { schema: route.form },
         ...(hasFile
           ? {}
           : {
               'application/x-www-form-urlencoded': {
-                schema: mergedParams.form,
+                schema: route.form,
               },
             }),
       },
@@ -175,13 +162,17 @@ function createZodOpenApiPathItem(route: OpenApiRoute) {
   } else if (route.file) {
     requestBody = {
       content: {
-        'multipart/form-data': { schema: z.object({ file: route.file }) },
+        'multipart/form-data': {
+          schema: z.object({ file: route.file }),
+        },
       },
     }
   } else if (route.files) {
     requestBody = {
       content: {
-        'multipart/form-data': { schema: z.object({ files: route.files }) },
+        'multipart/form-data': {
+          schema: z.object({ files: route.files }),
+        },
       },
     }
   }
