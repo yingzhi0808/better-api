@@ -1,4 +1,5 @@
 export * from '@/core/api'
 export * from '@/core/context'
+export * from '@/core/error'
 export * from '@/core/response'
 export * from '@/types/error'

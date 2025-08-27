@@ -1,16 +1,12 @@
-import {
-  type ErrorHandler,
-  type Handler,
-  Hono,
-  type Context as HonoContext,
-} from 'hono'
+import { STATUS_CODES } from 'node:http'
+import { type Handler, Hono, type Context as HonoContext } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { HTTPException } from 'hono/http-exception'
-import type { HTTPResponseError } from 'hono/types'
 import type { Cookie } from 'hono/utils/cookie'
 import type { RequestHeader } from 'hono/utils/headers'
 import type { StatusCode } from 'hono/utils/http-status'
 import type { ZodArray, ZodFile, ZodObject, ZodType } from 'zod'
+import type { $ZodIssue } from 'zod/v4/core'
 import type { CreateDocumentOptions, ZodOpenApiObject } from 'zod-openapi'
 import { Context } from '@/core/context'
 import {
@@ -19,10 +15,11 @@ import {
   resolveProvider,
   runWithRequestScope,
 } from '@/core/di'
+import { ValidationError } from '@/core/error'
 import { registerOpenApiRoute } from '@/core/openapi'
 import { JSONResponse } from '@/core/response'
 import type { HttpMethod } from '@/types/common'
-import type { ErrorHandlerMap } from '@/types/error'
+import type { ErrorHandler, ValidationErrors } from '@/types/error'
 import type {
   InferAllResponses,
   InferBody,
@@ -39,7 +36,6 @@ import type {
   ResponsesDefinition,
   ZodOpenApiResponsesObject,
 } from '@/types/response'
-import type { ValidationErrors } from '@/types/zod'
 import { normalizeZodOpenApiResponses } from '@/utils/response'
 import { isZodType, mergeZodObjects } from '@/utils/zod'
 
@@ -107,15 +103,6 @@ export let globalOpenApiOptions: BetterAPIOptions<
   ZodObject
 > = {}
 
-const errorHandler = (err: Error | HTTPResponseError, c: HonoContext) => {
-  if ('getResponse' in err) {
-    const res = err.getResponse()
-    return c.newResponse(res.body, res)
-  }
-  console.error(err)
-  return c.text('Internal Server Error', 500)
-}
-
 export class BetterAPI<
   GlobalParams extends ZodObject,
   GlobalQuery extends ZodObject,
@@ -123,7 +110,7 @@ export class BetterAPI<
   GlobalCookies extends ZodObject,
 > {
   private instance = new Hono()
-  private errorHandlers: ErrorHandlerMap = new Map()
+  private errorHandlers = new Map()
 
   constructor(
     options?: BetterAPIOptions<
@@ -138,6 +125,7 @@ export class BetterAPI<
     }
 
     this.setupErrorHandler()
+    this.registerDefaultErrorHandlers()
   }
 
   getInstance() {
@@ -155,8 +143,9 @@ export class BetterAPI<
    * @param handler 错误处理器函数
    */
   registerErrorHandler<T extends Error>(
-    errorType: new (...args: unknown[]) => T,
-    handler: ErrorHandler,
+    // biome-ignore lint/suspicious/noExplicitAny: 错误构造函数参数类型未知，使用 any[] 保持灵活性以支持各种错误类型
+    errorType: new (...args: any[]) => T,
+    handler: ErrorHandler<T>,
   ) {
     this.errorHandlers.set(errorType, handler)
   }
@@ -168,7 +157,7 @@ export class BetterAPI<
    */
   private findErrorHandler(error: Error) {
     for (const [errorType, handler] of this.errorHandlers) {
-      if (error instanceof errorType) {
+      if (error.constructor === errorType) {
         return handler
       }
     }
@@ -186,7 +175,36 @@ export class BetterAPI<
         return handler(error, c)
       }
 
-      return errorHandler(error, c)
+      return c.json({ message: 'Internal Server Error' }, 500)
+    })
+  }
+
+  /**
+   * 注册默认错误处理器
+   */
+  private registerDefaultErrorHandlers() {
+    this.registerErrorHandler(HTTPException, (error, c) => {
+      if (error.res) {
+        return c.newResponse(error.res.body, error.res)
+      }
+
+      return c.json(
+        { message: error.message || STATUS_CODES[error.status] },
+        error.status,
+      )
+    })
+
+    this.registerErrorHandler(ValidationError, (error, c) => {
+      const errorResponse: Record<string, $ZodIssue[]> = {}
+
+      Object.entries(error.errors).forEach(([key, zodError]) => {
+        errorResponse[key] = zodError.issues
+      })
+
+      return c.json(
+        { error: errorResponse, message: error.message },
+        error.status,
+      )
     })
   }
 
@@ -290,7 +308,7 @@ export class BetterAPI<
           if (success) {
             typedParams = data
           } else {
-            validationErrors.params = error.issues
+            validationErrors.params = error
           }
         }
 
@@ -312,7 +330,7 @@ export class BetterAPI<
           if (success) {
             typedQuery = data
           } else {
-            validationErrors.query = error.issues
+            validationErrors.query = error
           }
         }
 
@@ -327,7 +345,7 @@ export class BetterAPI<
           if (success) {
             typedHeaders = data
           } else {
-            validationErrors.headers = error.issues
+            validationErrors.headers = error
           }
         }
 
@@ -340,7 +358,7 @@ export class BetterAPI<
           if (success) {
             typedCookies = data
           } else {
-            validationErrors.cookies = error.issues
+            validationErrors.cookies = error
           }
         }
 
@@ -353,7 +371,7 @@ export class BetterAPI<
           if (success) {
             typedBody = data
           } else {
-            validationErrors.body = error.issues
+            validationErrors.body = error
           }
         }
 
@@ -366,7 +384,7 @@ export class BetterAPI<
           if (success) {
             typedForm = data
           } else {
-            validationErrors.form = error.issues
+            validationErrors.form = error
           }
         }
 
@@ -380,7 +398,7 @@ export class BetterAPI<
           if (success) {
             typedFile = data
           } else {
-            validationErrors.file = error.issues
+            validationErrors.file = error
           }
         }
 
@@ -396,13 +414,13 @@ export class BetterAPI<
           if (success) {
             typedFiles = data
           } else {
-            validationErrors.files = error.issues
+            validationErrors.files = error
           }
         }
 
         if (Object.keys(validationErrors).length > 0) {
-          throw new HTTPException(400, {
-            res: new JSONResponse(validationErrors, 400),
+          throw new ValidationError(validationErrors, 400, {
+            message: 'Request validation failed',
           })
         }
 
@@ -465,9 +483,8 @@ export class BetterAPI<
                 return new JSONResponse(data, statusCode)
               }
 
-              throw new HTTPException(500, {
-                cause: error,
-                message: 'Internal Server Error',
+              throw new ValidationError({ response: error }, 500, {
+                message: 'Response validation failed',
               })
             }
           }

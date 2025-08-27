@@ -1,11 +1,9 @@
-import type { ErrorHandler } from 'hono'
+import type { Context } from 'hono'
+import type { ZodError } from 'zod'
 
-/**
- * 错误处理器映射表类型
- */
-export type ErrorHandlerMap = Map<
-  new (
-    ...args: unknown[]
-  ) => Error,
-  ErrorHandler
->
+export type ErrorHandler<T extends Error> = (
+  err: T,
+  c: Context,
+) => Response | Promise<Response>
+
+export type ValidationErrors = Record<string, ZodError>
