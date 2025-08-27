@@ -6,6 +6,7 @@ import type { Cookie } from 'hono/utils/cookie'
 import type { RequestHeader } from 'hono/utils/headers'
 import type { StatusCode } from 'hono/utils/http-status'
 import type { ZodArray, ZodFile, ZodObject, ZodType } from 'zod'
+import { z } from 'zod'
 import type { $ZodIssue } from 'zod/v4/core'
 import type { CreateDocumentOptions, ZodOpenApiObject } from 'zod-openapi'
 import { Context } from '@/core/context'
@@ -122,6 +123,7 @@ export class BetterAPI<
   ) {
     if (options) {
       globalOpenApiOptions = options
+      this.setDefaultGlobalResponses(options)
     }
 
     this.setupErrorHandler()
@@ -195,6 +197,10 @@ export class BetterAPI<
     })
 
     this.registerErrorHandler(ValidationError, (error, c) => {
+      if (error.res) {
+        return c.newResponse(error.res.body, error.res)
+      }
+
       const errorResponse: Record<string, $ZodIssue[]> = {}
 
       Object.entries(error.errors).forEach(([key, zodError]) => {
@@ -206,6 +212,38 @@ export class BetterAPI<
         error.status,
       )
     })
+  }
+
+  /**
+   * 设置默认全局响应
+   */
+  private setDefaultGlobalResponses(
+    options: BetterAPIOptions<
+      GlobalParams,
+      GlobalQuery,
+      GlobalHeaders,
+      GlobalCookies
+    >,
+  ) {
+    if (!options.globalResponses) {
+      options.globalResponses = {}
+    }
+
+    // 设置默认的 400 Bad Request 响应
+    if (!options.globalResponses[400]) {
+      options.globalResponses[400] = z.object({
+        message: z.string().default('Bad Request'),
+        error: z.unknown().optional(),
+      })
+    }
+
+    // 设置默认的 500 Internal Server Error 响应
+    if (!options.globalResponses[500]) {
+      options.globalResponses[500] = z.object({
+        message: z.string().default('Internal Server Error'),
+        error: z.unknown().optional(),
+      })
+    }
   }
 
   private registerRoute<
@@ -484,7 +522,7 @@ export class BetterAPI<
               }
 
               throw new ValidationError({ response: error }, 500, {
-                message: 'Response validation failed',
+                res: new JSONResponse(error, 500),
               })
             }
           }
