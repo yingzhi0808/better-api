@@ -358,8 +358,10 @@ export class BetterAPI<
           rawParams
 
         if (mergedParams) {
-          const { success, data, error } =
-            await mergedParams.safeParseAsync(rawParams)
+          const { success, data, error } = await mergedParams.safeParseAsync(
+            rawParams,
+            { reportInput: true },
+          )
           if (success) {
             typedParams = data
           } else {
@@ -380,7 +382,7 @@ export class BetterAPI<
 
         if (mergedQuery) {
           const { success, data, error } =
-            await mergedQuery.safeParseAsync(rawQuery)
+            await mergedQuery.safeParseAsync(rawQuery, { reportInput: true })
 
           if (success) {
             typedQuery = data
@@ -396,7 +398,7 @@ export class BetterAPI<
 
         if (mergedHeaders) {
           const { success, data, error } =
-            await mergedHeaders.safeParseAsync(rawHeaders)
+            await mergedHeaders.safeParseAsync(rawHeaders, { reportInput: true })
           if (success) {
             typedHeaders = data
           } else {
@@ -409,7 +411,7 @@ export class BetterAPI<
 
         if (mergedCookies) {
           const { success, data, error } =
-            await mergedCookies.safeParseAsync(rawCookies)
+            await mergedCookies.safeParseAsync(rawCookies, { reportInput: true })
           if (success) {
             typedCookies = data
           } else {
@@ -422,7 +424,7 @@ export class BetterAPI<
         if (options?.body) {
           const rawBody = await c.req.json()
           const { success, data, error } =
-            await options.body.safeParseAsync(rawBody)
+            await options.body.safeParseAsync(rawBody, { reportInput: true })
           if (success) {
             typedBody = data
           } else {
@@ -435,7 +437,7 @@ export class BetterAPI<
         if (options?.form) {
           const rawForm = await c.req.parseBody({ all: true })
           const { success, data, error } =
-            await options.form.safeParseAsync(rawForm)
+            await options.form.safeParseAsync(rawForm, { reportInput: true })
           if (success) {
             typedForm = data
           } else {
@@ -449,7 +451,7 @@ export class BetterAPI<
           const rawForm = await c.req.parseBody({ all: true })
           const rawFile = rawForm.file
           const { success, data, error } =
-            await options.file.safeParseAsync(rawFile)
+            await options.file.safeParseAsync(rawFile, { reportInput: true })
           if (success) {
             typedFile = data
           } else {
@@ -465,7 +467,7 @@ export class BetterAPI<
             ? rawForm.files
             : [rawForm.files]
           const { success, data, error } =
-            await options.files.safeParseAsync(rawFiles)
+            await options.files.safeParseAsync(rawFiles, { reportInput: true })
           if (success) {
             typedFiles = data
           } else {
@@ -531,7 +533,9 @@ export class BetterAPI<
 
             if (validationSchema) {
               const { success, data, error } =
-                await validationSchema.safeParseAsync(responseData)
+                await validationSchema.safeParseAsync(responseData, {
+                  reportInput: true,
+                })
               if (success) {
                 return new JSONResponse(data, statusCode)
               }

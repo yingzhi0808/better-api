@@ -54,9 +54,6 @@ export class ValidationError extends HTTPException {
 
     Object.entries(errors).forEach(([key, zodError]) => {
       errorResponse[key] = zodError.issues
-      zodError.issues.forEach((issue) => {
-        console.log(issue.code)
-      })
     })
 
     super(status, { error: errorResponse, message: options?.message }, options)
