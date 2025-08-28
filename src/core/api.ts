@@ -1,4 +1,4 @@
-import { STATUS_CODES } from 'node:http'
+import http from 'node:http'
 import { type Handler, Hono, type Context as HonoContext } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { HTTPException } from 'hono/http-exception'
@@ -7,7 +7,6 @@ import type { RequestHeader } from 'hono/utils/headers'
 import type { StatusCode } from 'hono/utils/http-status'
 import type { ZodArray, ZodFile, ZodObject, ZodType } from 'zod'
 import { z } from 'zod'
-import type { $ZodIssue } from 'zod/v4/core'
 import type { CreateDocumentOptions, ZodOpenApiObject } from 'zod-openapi'
 import { Context } from '@/core/context'
 import {
@@ -16,9 +15,9 @@ import {
   resolveProvider,
   runWithRequestScope,
 } from '@/core/di'
-import { ValidationError } from '@/core/error'
 import { registerOpenApiRoute } from '@/core/openapi'
 import { JSONResponse } from '@/core/response'
+import { RequestValidationError, ResponseValidationError } from '@/errors'
 import type { HttpMethod } from '@/types/common'
 import type { ErrorHandler, ValidationErrors } from '@/types/error'
 import type {
@@ -153,18 +152,42 @@ export class BetterAPI<
   }
 
   /**
+   * 计算类的继承深度
+   * @param ctor 构造函数
+   * @returns 继承深度（数字越大表示越具体的子类）
+   */
+  private getInheritanceDepth(ctor: new (...args: unknown[]) => unknown) {
+    let depth = 0
+    let current = ctor
+
+    while (current && current !== Error) {
+      depth++
+      current = Object.getPrototypeOf(current)
+    }
+
+    return depth
+  }
+
+  /**
    * 查找匹配的错误处理器
    * @param error 错误实例
-   * @returns 匹配的错误处理器和优先级
+   * @returns 匹配的错误处理器
    */
   private findErrorHandler(error: Error) {
+    let bestMatch: ErrorHandler<Error> | null = null
+    let maxDepth = -1
+
     for (const [errorType, handler] of this.errorHandlers) {
-      if (error.constructor === errorType) {
-        return handler
+      if (error instanceof errorType) {
+        const depth = this.getInheritanceDepth(errorType)
+        if (depth > maxDepth) {
+          maxDepth = depth
+          bestMatch = handler
+        }
       }
     }
 
-    return null
+    return bestMatch
   }
 
   /**
@@ -177,6 +200,7 @@ export class BetterAPI<
         return handler(error, c)
       }
 
+      console.error(error)
       return c.json({ message: 'Internal Server Error' }, 500)
     })
   }
@@ -186,31 +210,13 @@ export class BetterAPI<
    */
   private registerDefaultErrorHandlers() {
     this.registerErrorHandler(HTTPException, (error, c) => {
-      if (error.res) {
-        return c.newResponse(error.res.body, error.res)
-      }
-
-      return c.json(
-        { message: error.message || STATUS_CODES[error.status] },
-        error.status,
-      )
+      const res = error.getResponse()
+      return c.newResponse(res.body, res)
     })
 
-    this.registerErrorHandler(ValidationError, (error, c) => {
-      if (error.res) {
-        return c.newResponse(error.res.body, error.res)
-      }
-
-      const errorResponse: Record<string, $ZodIssue[]> = {}
-
-      Object.entries(error.errors).forEach(([key, zodError]) => {
-        errorResponse[key] = zodError.issues
-      })
-
-      return c.json(
-        { error: errorResponse, message: error.message },
-        error.status,
-      )
+    this.registerErrorHandler(ResponseValidationError, (error, c) => {
+      console.error(error)
+      return c.json({ message: http.STATUS_CODES[error.status] }, error.status)
     })
   }
 
@@ -232,8 +238,20 @@ export class BetterAPI<
     // 设置默认的 400 Bad Request 响应
     if (!options.globalResponses[400]) {
       options.globalResponses[400] = z.object({
-        message: z.string().default('Bad Request'),
-        error: z.unknown().optional(),
+        message: z.string().default('Request validation failed'),
+        error: z.record(
+          z.enum([
+            'params',
+            'query',
+            'headers',
+            'cookies',
+            'body',
+            'form',
+            'file',
+            'files',
+          ]),
+          z.array(z.object({})),
+        ),
       })
     }
 
@@ -241,7 +259,6 @@ export class BetterAPI<
     if (!options.globalResponses[500]) {
       options.globalResponses[500] = z.object({
         message: z.string().default('Internal Server Error'),
-        error: z.unknown().optional(),
       })
     }
   }
@@ -457,9 +474,7 @@ export class BetterAPI<
         }
 
         if (Object.keys(validationErrors).length > 0) {
-          throw new ValidationError(validationErrors, 400, {
-            message: 'Request validation failed',
-          })
+          throw new RequestValidationError(400, validationErrors)
         }
 
         // dependencies
@@ -521,9 +536,7 @@ export class BetterAPI<
                 return new JSONResponse(data, statusCode)
               }
 
-              throw new ValidationError({ response: error }, 500, {
-                res: new JSONResponse(error, 500),
-              })
+              throw new ResponseValidationError(500, { response: error })
             }
           }
         }
