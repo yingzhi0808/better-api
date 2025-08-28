@@ -1,8 +1,10 @@
 import http from 'node:http'
 import z, { type ZodArray, ZodFile, type ZodObject, type ZodType } from 'zod'
+import type { BodyOption } from '@/types/common'
 import type { ZodOpenApiResponsesObject } from '@/types/response'
 import { convertExpressPathToOpenAPI } from '@/utils/openapi'
 import { normalizeZodOpenApiResponses } from '@/utils/response'
+import { isZodType } from '@/utils/zod'
 import 'zod-openapi'
 import {
   type ZodOpenApiResponsesObject as _ZodOpenApiResponsesObject,
@@ -23,7 +25,7 @@ interface OpenApiRoute {
   query?: ZodObject
   headers?: ZodObject
   cookies?: ZodObject
-  body?: ZodType
+  body?: BodyOption<ZodType>
   form?: ZodObject
   file?: ZodFile
   files?: ZodArray<ZodFile>
@@ -104,10 +106,27 @@ function createZodOpenApiPathItem(route: OpenApiRoute) {
 
   let requestBody: ZodOpenApiRequestBodyObject | undefined
   if (route.body) {
-    requestBody = {
-      content: {
-        'application/json': { schema: route.body },
-      },
+    let schema: ZodType | undefined
+    let description: string | undefined
+    let required = true
+
+    // 处理两种body写法
+    if (isZodType(route.body)) {
+      schema = route.body
+    } else if (typeof route.body === 'object' && 'schema' in route.body) {
+      schema = route.body.schema
+      description = route.body.description
+      required = route.body.required !== false
+    }
+
+    if (schema) {
+      requestBody = {
+        description,
+        required,
+        content: {
+          'application/json': { schema },
+        },
+      }
     }
   } else if (route.form) {
     const hasFile = Object.values(route.form.shape).some(

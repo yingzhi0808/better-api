@@ -424,15 +424,48 @@ export class BetterAPI<
         let typedBody: unknown | undefined
 
         if (options?.body) {
-          const rawBody = await c.req.json()
-          const { success, data, error } = await options.body.safeParseAsync(
-            rawBody,
-            { reportInput: true },
-          )
-          if (success) {
-            typedBody = data
-          } else {
-            validationErrors.body = error
+          let schema: ZodType | undefined
+          let isRequired = true
+
+          // 处理两种body写法
+          if (isZodType(options.body)) {
+            schema = options.body
+          } else if (
+            typeof options.body === 'object' &&
+            'schema' in options.body
+          ) {
+            schema = options.body.schema
+            isRequired = options.body.required !== false
+          }
+
+          if (schema) {
+            if (isRequired) {
+              // 必填body
+              const rawBody = await c.req.json()
+              const { success, data, error } = await schema.safeParseAsync(
+                rawBody,
+                { reportInput: true },
+              )
+              if (success) {
+                typedBody = data
+              } else {
+                validationErrors.body = error
+              }
+            } else {
+              // 可选body - 尝试解析，如果解析失败则设为undefined
+              try {
+                const rawBody = await c.req.json()
+                const { success, data } = await schema.safeParseAsync(rawBody, {
+                  reportInput: true,
+                })
+                if (success) {
+                  typedBody = data
+                }
+              } catch {
+                // 如果请求体为空或解析失败，typedBody保持undefined
+                typedBody = undefined
+              }
+            }
           }
         }
 

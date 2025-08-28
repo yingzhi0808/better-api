@@ -3,6 +3,7 @@ import type { RequestHeader } from 'hono/utils/headers'
 import type { StatusCode } from 'hono/utils/http-status'
 import type z from 'zod'
 import type { ZodArray, ZodFile, ZodObject, ZodType } from 'zod'
+import type { BodyOption } from './common'
 import type {
   BetterApiResponses,
   SimplifiedZodOpenApiResponseObject,
@@ -23,7 +24,17 @@ export type InferHeaders<T> = T extends ZodObject
 
 export type InferCookies<T> = T extends ZodObject ? z.infer<T> : Cookie
 
-export type InferBody<T> = T extends ZodType ? z.infer<T> : never
+export type InferBody<T> = T extends BodyOption
+  ? T extends ZodType
+    ? z.infer<T>
+    : T extends { schema: infer S; required?: boolean }
+      ? S extends ZodType
+        ? T['required'] extends false
+          ? z.infer<S> | undefined
+          : z.infer<S>
+        : never
+      : never
+  : never
 
 export type InferForm<T> = T extends ZodObject ? z.infer<T> : never
 
