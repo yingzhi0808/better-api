@@ -239,18 +239,14 @@ export class BetterAPI<
     if (!options.globalResponses[400]) {
       options.globalResponses[400] = z.object({
         message: z.string().default('Request validation failed'),
-        error: z.record(
-          z.enum([
-            'params',
-            'query',
-            'headers',
-            'cookies',
-            'body',
-            'form',
-            'file',
-            'files',
-          ]),
-          z.array(z.object({})),
+        error: z.array(
+          z.object({
+            in: z.string(),
+            code: z.string(),
+            path: z.array(z.string()),
+            input: z.unknown(),
+            message: z.string(),
+          }),
         ),
       })
     }
@@ -381,8 +377,10 @@ export class BetterAPI<
           | Record<string, unknown> = rawQuery
 
         if (mergedQuery) {
-          const { success, data, error } =
-            await mergedQuery.safeParseAsync(rawQuery, { reportInput: true })
+          const { success, data, error } = await mergedQuery.safeParseAsync(
+            rawQuery,
+            { reportInput: true },
+          )
 
           if (success) {
             typedQuery = data
@@ -397,8 +395,10 @@ export class BetterAPI<
           | Record<string, unknown> = rawHeaders
 
         if (mergedHeaders) {
-          const { success, data, error } =
-            await mergedHeaders.safeParseAsync(rawHeaders, { reportInput: true })
+          const { success, data, error } = await mergedHeaders.safeParseAsync(
+            rawHeaders,
+            { reportInput: true },
+          )
           if (success) {
             typedHeaders = data
           } else {
@@ -410,8 +410,10 @@ export class BetterAPI<
         let typedCookies: Cookie | Record<string, unknown> = rawCookies
 
         if (mergedCookies) {
-          const { success, data, error } =
-            await mergedCookies.safeParseAsync(rawCookies, { reportInput: true })
+          const { success, data, error } = await mergedCookies.safeParseAsync(
+            rawCookies,
+            { reportInput: true },
+          )
           if (success) {
             typedCookies = data
           } else {
@@ -423,8 +425,10 @@ export class BetterAPI<
 
         if (options?.body) {
           const rawBody = await c.req.json()
-          const { success, data, error } =
-            await options.body.safeParseAsync(rawBody, { reportInput: true })
+          const { success, data, error } = await options.body.safeParseAsync(
+            rawBody,
+            { reportInput: true },
+          )
           if (success) {
             typedBody = data
           } else {
@@ -436,8 +440,10 @@ export class BetterAPI<
 
         if (options?.form) {
           const rawForm = await c.req.parseBody({ all: true })
-          const { success, data, error } =
-            await options.form.safeParseAsync(rawForm, { reportInput: true })
+          const { success, data, error } = await options.form.safeParseAsync(
+            rawForm,
+            { reportInput: true },
+          )
           if (success) {
             typedForm = data
           } else {
@@ -450,8 +456,10 @@ export class BetterAPI<
         if (options?.file) {
           const rawForm = await c.req.parseBody({ all: true })
           const rawFile = rawForm.file
-          const { success, data, error } =
-            await options.file.safeParseAsync(rawFile, { reportInput: true })
+          const { success, data, error } = await options.file.safeParseAsync(
+            rawFile,
+            { reportInput: true },
+          )
           if (success) {
             typedFile = data
           } else {
@@ -466,8 +474,10 @@ export class BetterAPI<
           const rawFiles = Array.isArray(rawForm.files)
             ? rawForm.files
             : [rawForm.files]
-          const { success, data, error } =
-            await options.files.safeParseAsync(rawFiles, { reportInput: true })
+          const { success, data, error } = await options.files.safeParseAsync(
+            rawFiles,
+            { reportInput: true },
+          )
           if (success) {
             typedFiles = data
           } else {

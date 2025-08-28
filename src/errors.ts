@@ -2,7 +2,6 @@ import http from 'node:http'
 import { HTTPException as HonoHTTPException } from 'hono/http-exception'
 import type { CustomHeader, ResponseHeader } from 'hono/utils/headers'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
-import type { $ZodIssue } from 'zod/v4/core'
 import { JSONResponse } from './core/response'
 import type { ValidationErrors } from './types/error'
 
@@ -50,11 +49,12 @@ export class ValidationError extends HTTPException {
     public readonly errors: ValidationErrors,
     options?: HTTPExceptionOptions,
   ) {
-    const errorResponse: Record<string, $ZodIssue[]> = {}
-
-    Object.entries(errors).forEach(([key, zodError]) => {
-      errorResponse[key] = zodError.issues
-    })
+    const errorResponse = Object.entries(errors).flatMap(([key, zodError]) =>
+      zodError.issues.map((issue) => ({
+        in: key,
+        ...issue,
+      })),
+    )
 
     super(status, { error: errorResponse, message: options?.message }, options)
   }
