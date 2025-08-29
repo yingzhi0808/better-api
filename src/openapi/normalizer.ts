@@ -2,6 +2,9 @@ import type { ZodOpenApiRequestBodyObject } from 'zod-openapi'
 import { isZodType } from '@/utils/zod'
 import type {
   BodySchema,
+  FileSchema,
+  FilesSchema,
+  FormSchema,
   ResponsesSchema,
   RouteResponses,
   SimpleZodOpenApiRequestBodyObject,
@@ -150,6 +153,121 @@ export function normalizeBodySchema(body: BodySchema) {
     return {
       required: true,
       ...body,
+    }
+  }
+
+  return undefined
+}
+
+export function normalizeFormSchema(form: FormSchema) {
+  if (isZodType(form)) {
+    return {
+      required: true,
+      content: {
+        'multipart/form-data': {
+          schema: form,
+        },
+        'application/x-www-form-urlencoded': {
+          schema: form,
+        },
+      },
+    }
+  }
+
+  if (isSimpleZodOpenApiRequestBodyObject(form)) {
+    const { schema, description, required = true, ...rest } = form
+    return {
+      required,
+      description,
+      content: {
+        'multipart/form-data': {
+          schema,
+          ...rest,
+        },
+        'application/x-www-form-urlencoded': {
+          schema,
+          ...rest,
+        },
+      },
+    }
+  }
+
+  if (isZodOpenApiRequestBodyObject(form)) {
+    return {
+      required: true,
+      ...form,
+    }
+  }
+
+  return undefined
+}
+
+export function normalizeFileSchema(file: FileSchema) {
+  if (isZodType(file)) {
+    return {
+      required: true,
+      content: {
+        'multipart/form-data': {
+          schema: file,
+        },
+      },
+    }
+  }
+
+  if (isSimpleZodOpenApiRequestBodyObject(file)) {
+    const { schema, description, required = true, ...rest } = file
+    return {
+      required,
+      description,
+      content: {
+        'multipart/form-data': {
+          schema,
+          ...rest,
+        },
+      },
+    }
+  }
+
+  if (isZodOpenApiRequestBodyObject(file)) {
+    return {
+      required: true,
+      ...file,
+    }
+  }
+
+  return undefined
+}
+
+export function normalizeFilesSchema(files: FilesSchema) {
+  if (isZodType(files)) {
+    return {
+      required: true,
+      content: {
+        'multipart/form-data': {
+          schema: files,
+        },
+      },
+    }
+  }
+
+  if (isSimpleZodOpenApiRequestBodyObject(files)) {
+    const { schema, description, required = true, ...rest } = files
+    return {
+      required,
+      description,
+      content: {
+        'multipart/form-data': {
+          schema,
+          ...rest,
+        },
+      },
+    }
+  }
+
+  if (isZodOpenApiRequestBodyObject(files)) {
+    return {
+      required: true,
+      ...files,
     }
   }
 

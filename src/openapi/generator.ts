@@ -1,5 +1,4 @@
 import http from 'node:http'
-import z, { ZodFile } from 'zod'
 import { globalOpenApiOptions } from '@/BetterAPI'
 import 'zod-openapi'
 import {
@@ -10,6 +9,7 @@ import {
   type ZodOpenApiParameters,
   type ZodOpenApiPathItemObject,
   type ZodOpenApiPathsObject,
+  type ZodOpenApiRequestBodyObject,
 } from 'zod-openapi'
 import { normalizeResponsesSchema } from './normalizer'
 import { openAPIRoutes } from './registry'
@@ -51,57 +51,27 @@ function createZodOpenApiPathItemObject(
   route: OpenApiRouteConfig,
 ): ZodOpenApiPathItemObject {
   const requestParams: ZodOpenApiParameters = {}
-
   if (route.params) {
     requestParams.path = route.params
   }
-
   if (route.query) {
     requestParams.query = route.query
   }
-
   if (route.headers) {
     requestParams.header = route.headers
   }
-
   if (route.cookies) {
     requestParams.cookie = route.cookies
   }
-
-  let requestBody = route.body
-
-  if (route.form) {
-    const hasFile = Object.values(route.form.shape).some(
-      (v) => v instanceof ZodFile,
-    )
-    requestBody = {
-      content: {
-        'multipart/form-data': { schema: route.form },
-        ...(hasFile
-          ? {}
-          : {
-              'application/x-www-form-urlencoded': {
-                schema: route.form,
-              },
-            }),
-      },
-    }
+  let requestBody: ZodOpenApiRequestBodyObject | undefined
+  if (route.body) {
+    requestBody = route.body
+  } else if (route.form) {
+    requestBody = route.form
   } else if (route.file) {
-    requestBody = {
-      content: {
-        'multipart/form-data': {
-          schema: z.object({ file: route.file }),
-        },
-      },
-    }
+    requestBody = route.file
   } else if (route.files) {
-    requestBody = {
-      content: {
-        'multipart/form-data': {
-          schema: z.object({ files: route.files }),
-        },
-      },
-    }
+    requestBody = route.files
   }
 
   const responses: _ZodOpenApiResponsesObject = {}

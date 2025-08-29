@@ -15,9 +15,9 @@ export interface OpenApiRouteConfig {
   headers?: ZodObject
   cookies?: ZodObject
   body?: ZodOpenApiRequestBodyObject
-  form?: ZodObject
-  file?: ZodFile
-  files?: ZodArray<ZodFile>
+  form?: ZodOpenApiRequestBodyObject
+  file?: ZodOpenApiRequestBodyObject
+  files?: ZodOpenApiRequestBodyObject
   summary?: string
   description?: string
   tags?: string[]
@@ -73,5 +73,20 @@ export type SimpleZodOpenApiRequestBodyObject = Omit<
 
 export type BodySchema =
   | ZodType
+  | SimpleZodOpenApiRequestBodyObject
+  | ZodOpenApiRequestBodyObject
+
+export type FormSchema =
+  | ZodObject
+  | SimpleZodOpenApiRequestBodyObject
+  | ZodOpenApiRequestBodyObject
+
+export type FileSchema =
+  | ZodFile
+  | SimpleZodOpenApiRequestBodyObject
+  | ZodOpenApiRequestBodyObject
+
+export type FilesSchema =
+  | ZodArray<ZodFile>
   | SimpleZodOpenApiRequestBodyObject
   | ZodOpenApiRequestBodyObject

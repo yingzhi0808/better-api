@@ -5,7 +5,7 @@ import { HTTPException } from 'hono/http-exception'
 import type { Cookie } from 'hono/utils/cookie'
 import type { RequestHeader } from 'hono/utils/headers'
 import type { StatusCode } from 'hono/utils/http-status'
-import type { ZodArray, ZodFile, ZodObject, ZodType } from 'zod'
+import type { ZodObject } from 'zod'
 import { z } from 'zod'
 import type {
   CreateDocumentOptions,
@@ -34,12 +34,18 @@ import type {
 } from '@/inference'
 import type {
   BodySchema,
+  FileSchema,
+  FilesSchema,
+  FormSchema,
   ResponsesSchema,
   RouteResponse,
   ZodOpenApiResponsesObject,
 } from '@/openapi'
 import {
   normalizeBodySchema,
+  normalizeFileSchema,
+  normalizeFilesSchema,
+  normalizeFormSchema,
   normalizeResponsesSchema,
   registerOpenApiRoute,
 } from '@/openapi'
@@ -273,9 +279,9 @@ export class BetterAPI<
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
     Body extends BodySchema | undefined = undefined,
-    Form extends ZodObject | undefined = undefined,
-    File extends ZodFile | undefined = undefined,
-    Files extends ZodArray<ZodFile> | undefined = undefined,
+    Form extends FormSchema | undefined = undefined,
+    File extends FileSchema | undefined = undefined,
+    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -312,6 +318,9 @@ export class BetterAPI<
     const responses =
       options?.responses && normalizeResponsesSchema(options?.responses)
     const body = options?.body && normalizeBodySchema(options.body)
+    const form = options?.form && normalizeFormSchema(options.form)
+    const file = options?.file && normalizeFileSchema(options.file)
+    const files = options?.files && normalizeFilesSchema(options.files)
 
     const globalRequestParams = globalOpenApiOptions.globalRequestParams
 
@@ -344,9 +353,9 @@ export class BetterAPI<
       headers: mergedHeaders,
       cookies: mergedCookies,
       body,
-      form: options?.form,
-      file: options?.file,
-      files: options?.files,
+      form,
+      file,
+      files,
       summary: options?.summary,
       description: options?.description,
       tags: options?.tags,
@@ -432,76 +441,102 @@ export class BetterAPI<
 
         let typedBody: unknown | undefined
 
-        async function parseBody(validationSchema: ZodType) {
-          const rawBody = await c.req.json()
-          const { success, data, error } =
-            await validationSchema.safeParseAsync(rawBody, {
-              reportInput: true,
-            })
-          if (success) {
-            typedBody = data
-          } else {
-            validationErrors.body = error
-          }
-        }
-
         if (body) {
-          const validationSchema = getRequestBodyValidationSchema(body)
+          const validationSchema = getRequestBodyValidationSchema(body, [
+            'application/json',
+          ])
           const bodyLength = Number(
             c.req.header('content-length') ??
               (await c.req.arrayBuffer()).byteLength,
           )
           if (validationSchema && (bodyLength > 0 || body.required)) {
-            await parseBody(validationSchema)
+            const rawBody = await c.req.json()
+            const { success, data, error } =
+              await validationSchema.safeParseAsync(rawBody, {
+                reportInput: true,
+              })
+            if (success) {
+              typedBody = data
+            } else {
+              validationErrors.body = error
+            }
           }
         }
 
         let typedForm: unknown | undefined
 
-        if (options?.form) {
-          const rawForm = await c.req.parseBody({ all: true })
-          const { success, data, error } = await options.form.safeParseAsync(
-            rawForm,
-            { reportInput: true },
+        if (form) {
+          const validationSchema = getRequestBodyValidationSchema(form, [
+            'multipart/form-data',
+            'application/x-www-form-urlencoded',
+          ])
+          const bodyLength = Number(
+            c.req.header('content-length') ??
+              (await c.req.arrayBuffer()).byteLength,
           )
-          if (success) {
-            typedForm = data
-          } else {
-            validationErrors.form = error
+          if (validationSchema && (bodyLength > 0 || form.required)) {
+            const rawForm = await c.req.parseBody({ all: true })
+            const { success, data, error } =
+              await validationSchema.safeParseAsync(rawForm, {
+                reportInput: true,
+              })
+            if (success) {
+              typedForm = data
+            } else {
+              validationErrors.form = error
+            }
           }
         }
 
         let typedFile: unknown | undefined
 
-        if (options?.file) {
-          const rawForm = await c.req.parseBody({ all: true })
-          const rawFile = rawForm.file
-          const { success, data, error } = await options.file.safeParseAsync(
-            rawFile,
-            { reportInput: true },
+        if (file) {
+          const validationSchema = getRequestBodyValidationSchema(file, [
+            'multipart/form-data',
+          ])
+          const bodyLength = Number(
+            c.req.header('content-length') ??
+              (await c.req.arrayBuffer()).byteLength,
           )
-          if (success) {
-            typedFile = data
-          } else {
-            validationErrors.file = error
+          if (validationSchema && (bodyLength > 0 || file.required)) {
+            const rawForm = await c.req.parseBody({ all: true })
+            const rawFile = rawForm.file
+            const { success, data, error } =
+              await validationSchema.safeParseAsync(rawFile, {
+                reportInput: true,
+              })
+            if (success) {
+              typedFile = data
+            } else {
+              validationErrors.file = error
+            }
           }
         }
 
         let typedFiles: unknown | undefined
 
-        if (options?.files) {
-          const rawForm = await c.req.parseBody({ all: true })
-          const rawFiles = Array.isArray(rawForm.files)
-            ? rawForm.files
-            : [rawForm.files]
-          const { success, data, error } = await options.files.safeParseAsync(
-            rawFiles,
-            { reportInput: true },
+        if (files) {
+          const validationSchema = getRequestBodyValidationSchema(files, [
+            'multipart/form-data',
+          ])
+          const bodyLength = Number(
+            c.req.header('content-length') ??
+              (await c.req.arrayBuffer()).byteLength,
           )
-          if (success) {
-            typedFiles = data
-          } else {
-            validationErrors.files = error
+          if (validationSchema && (bodyLength > 0 || files.required)) {
+            const rawForm = await c.req.parseBody({ all: true })
+            const rawFiles = Array.isArray(rawForm.files)
+              ? rawForm.files
+              : [rawForm.files]
+            const { success, data, error } =
+              await validationSchema.safeParseAsync(rawFiles, {
+                reportInput: true,
+              })
+            if (success) {
+              typedFiles = data
+            } else {
+              validationErrors.files = error
+            }
           }
         }
 
@@ -614,9 +649,9 @@ export class BetterAPI<
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
     Body extends BodySchema | undefined = undefined,
-    Form extends ZodObject | undefined = undefined,
-    File extends ZodFile | undefined = undefined,
-    Files extends ZodArray<ZodFile> | undefined = undefined,
+    Form extends FormSchema | undefined = undefined,
+    File extends FileSchema | undefined = undefined,
+    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -659,9 +694,9 @@ export class BetterAPI<
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
     Body extends BodySchema | undefined = undefined,
-    Form extends ZodObject | undefined = undefined,
-    File extends ZodFile | undefined = undefined,
-    Files extends ZodArray<ZodFile> | undefined = undefined,
+    Form extends FormSchema | undefined = undefined,
+    File extends FileSchema | undefined = undefined,
+    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -703,10 +738,10 @@ export class BetterAPI<
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends ZodType | undefined = undefined,
-    Form extends ZodObject | undefined = undefined,
-    File extends ZodFile | undefined = undefined,
-    Files extends ZodArray<ZodFile> | undefined = undefined,
+    Body extends BodySchema | undefined = undefined,
+    Form extends FormSchema | undefined = undefined,
+    File extends FileSchema | undefined = undefined,
+    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -749,9 +784,9 @@ export class BetterAPI<
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
     Body extends BodySchema | undefined = undefined,
-    Form extends ZodObject | undefined = undefined,
-    File extends ZodFile | undefined = undefined,
-    Files extends ZodArray<ZodFile> | undefined = undefined,
+    Form extends FormSchema | undefined = undefined,
+    File extends FileSchema | undefined = undefined,
+    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -794,9 +829,9 @@ export class BetterAPI<
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
     Body extends BodySchema | undefined = undefined,
-    Form extends ZodObject | undefined = undefined,
-    File extends ZodFile | undefined = undefined,
-    Files extends ZodArray<ZodFile> | undefined = undefined,
+    Form extends FormSchema | undefined = undefined,
+    File extends FileSchema | undefined = undefined,
+    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -838,10 +873,10 @@ export class BetterAPI<
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends ZodType | undefined = undefined,
-    Form extends ZodObject | undefined = undefined,
-    File extends ZodFile | undefined = undefined,
-    Files extends ZodArray<ZodFile> | undefined = undefined,
+    Body extends BodySchema | undefined = undefined,
+    Form extends FormSchema | undefined = undefined,
+    File extends FileSchema | undefined = undefined,
+    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -884,9 +919,9 @@ export class BetterAPI<
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
     Body extends BodySchema | undefined = undefined,
-    Form extends ZodObject | undefined = undefined,
-    File extends ZodFile | undefined = undefined,
-    Files extends ZodArray<ZodFile> | undefined = undefined,
+    Form extends FormSchema | undefined = undefined,
+    File extends FileSchema | undefined = undefined,
+    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -929,9 +964,9 @@ export class BetterAPI<
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
     Body extends BodySchema | undefined = undefined,
-    Form extends ZodObject | undefined = undefined,
-    File extends ZodFile | undefined = undefined,
-    Files extends ZodArray<ZodFile> | undefined = undefined,
+    Form extends FormSchema | undefined = undefined,
+    File extends FileSchema | undefined = undefined,
+    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -978,7 +1013,13 @@ function getResponsesValidationSchema(
 
 function getRequestBodyValidationSchema(
   requestBody: ZodOpenApiRequestBodyObject,
+  mediaTypes: string[],
 ) {
-  const schema = requestBody?.content?.['application/json']?.schema
-  return isZodType(schema) ? schema : null
+  for (const mediaType of mediaTypes) {
+    const schema = requestBody?.content?.[mediaType]?.schema
+    if (isZodType(schema)) {
+      return schema
+    }
+  }
+  return null
 }
