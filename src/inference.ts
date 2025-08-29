@@ -3,12 +3,12 @@ import type { RequestHeader } from 'hono/utils/headers'
 import type { StatusCode } from 'hono/utils/http-status'
 import type z from 'zod'
 import type { ZodArray, ZodFile, ZodObject, ZodType } from 'zod'
-import type { BodyOption } from './common'
 import type {
-  BetterApiResponses,
-  SimplifiedZodOpenApiResponseObject,
+  RouteResponses,
+  SimpleZodOpenApiResponseObject,
   ZodOpenApiResponseObject,
-} from './response'
+} from '@/openapi'
+import type { BodySchema } from './openapi'
 
 export type InferParams<T> = T extends ZodObject
   ? z.infer<T>
@@ -24,7 +24,7 @@ export type InferHeaders<T> = T extends ZodObject
 
 export type InferCookies<T> = T extends ZodObject ? z.infer<T> : Cookie
 
-export type InferBody<T> = T extends BodyOption
+export type InferBody<T> = T extends BodySchema
   ? T extends ZodType
     ? z.infer<T>
     : T extends { schema: infer S; required?: boolean }
@@ -42,56 +42,55 @@ export type InferFile<T> = T extends ZodFile ? z.infer<T> : never
 
 export type InferFiles<T> = T extends ZodArray<ZodFile> ? z.infer<T> : never
 
-export type InferResponse<Response, Status> =
-  Response extends BetterApiResponses
-    ? Status extends keyof Response
-      ? Response[Status] extends ZodType
-        ? z.input<Response[Status]>
-        : Response[Status] extends SimplifiedZodOpenApiResponseObject
-          ? z.input<Response[Status]['schema']>
-          : Response[Status] extends ZodOpenApiResponseObject
-            ? Response[Status]['content'] extends {
-                'application/json': { schema: infer S }
-              }
-              ? S extends ZodType
-                ? z.input<S>
-                : never
+export type InferResponse<Response, Status> = Response extends RouteResponses
+  ? Status extends keyof Response
+    ? Response[Status] extends ZodType
+      ? z.input<Response[Status]>
+      : Response[Status] extends SimpleZodOpenApiResponseObject
+        ? z.input<Response[Status]['schema']>
+        : Response[Status] extends ZodOpenApiResponseObject
+          ? Response[Status]['content'] extends {
+              'application/json': { schema: infer S }
+            }
+            ? S extends ZodType
+              ? z.input<S>
               : never
             : never
-      : never
-    : Response extends ZodType
-      ? z.input<Response>
-      : Response extends SimplifiedZodOpenApiResponseObject
-        ? Status extends 200
-          ? z.input<Response['schema']>
           : never
-        : Response extends ZodOpenApiResponseObject
-          ? Status extends 200
-            ? Response['content'] extends {
-                'application/json': { schema: infer S }
-              }
-              ? S extends ZodType
-                ? z.input<S>
-                : never
+    : never
+  : Response extends ZodType
+    ? z.input<Response>
+    : Response extends SimpleZodOpenApiResponseObject
+      ? Status extends 200
+        ? z.input<Response['schema']>
+        : never
+      : Response extends ZodOpenApiResponseObject
+        ? Status extends 200
+          ? Response['content'] extends {
+              'application/json': { schema: infer S }
+            }
+            ? S extends ZodType
+              ? z.input<S>
               : never
             : never
-          : unknown
+          : never
+        : unknown
 
-export type InferStatus<T> = T extends BetterApiResponses
+export type InferStatus<T> = T extends RouteResponses
   ? keyof T & StatusCode
   : T extends ZodType
     ? 200
-    : T extends SimplifiedZodOpenApiResponseObject
+    : T extends SimpleZodOpenApiResponseObject
       ? 200
       : T extends ZodOpenApiResponseObject
         ? 200
         : StatusCode
 
-export type InferAllResponses<Response> = Response extends BetterApiResponses
+export type InferAllResponses<Response> = Response extends RouteResponses
   ? {
       [Status in keyof Response]: Response[Status] extends ZodType
         ? z.input<Response[Status]>
-        : Response[Status] extends SimplifiedZodOpenApiResponseObject
+        : Response[Status] extends SimpleZodOpenApiResponseObject
           ? z.input<Response[Status]['schema']>
           : Response[Status] extends ZodOpenApiResponseObject
             ? Response[Status]['content'] extends {
@@ -105,7 +104,7 @@ export type InferAllResponses<Response> = Response extends BetterApiResponses
     }[keyof Response]
   : Response extends ZodType
     ? z.input<Response>
-    : Response extends SimplifiedZodOpenApiResponseObject
+    : Response extends SimpleZodOpenApiResponseObject
       ? z.input<Response['schema']>
       : Response extends ZodOpenApiResponseObject
         ? Response['content'] extends {

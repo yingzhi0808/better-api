@@ -1,15 +1,8 @@
 import http from 'node:http'
 import { HTTPException as HonoHTTPException } from 'hono/http-exception'
-import type { CustomHeader, ResponseHeader } from 'hono/utils/headers'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
-import { JSONResponse } from './core/response'
-import type { ValidationErrors } from './types/error'
-
-export interface HTTPExceptionOptions {
-  cause?: unknown
-  message?: string
-  headers?: Record<ResponseHeader | CustomHeader, string>
-}
+import type { HTTPExceptionOptions, ValidationErrors } from '@/error'
+import { JSONResponse } from '@/response'
 
 /**
  * HTTP 异常类，用于在代码中抛出异常向客户端显示错误信息

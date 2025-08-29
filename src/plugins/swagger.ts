@@ -1,8 +1,8 @@
 import { relative } from 'node:path'
 import { serveStatic } from '@hono/node-server/serve-static'
 import type { Hono } from 'hono'
-import { generateOpenAPI } from '@/core/openapi'
-import { generateSwaggerUIHTML, getSwaggerUIAssetDir } from '@/core/swagger'
+import { generateDocument } from '@/openapi'
+import { generateSwaggerUIHTML, getSwaggerUIAssetDir } from '@/swagger'
 
 export interface HonoSwaggerOptions {
   /** Swagger UI HTML 的访问路径，默认 "/docs" */
@@ -32,6 +32,6 @@ export function mountSwaggerUI(app: Hono, options?: HonoSwaggerOptions) {
   })
 
   app.get('/openapi.json', (c) => {
-    return c.json(generateOpenAPI())
+    return c.json(generateDocument())
   })
 }

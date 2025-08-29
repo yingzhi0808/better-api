@@ -7,19 +7,20 @@ import type { RequestHeader } from 'hono/utils/headers'
 import type { StatusCode } from 'hono/utils/http-status'
 import type { ZodArray, ZodFile, ZodObject, ZodType } from 'zod'
 import { z } from 'zod'
-import type { CreateDocumentOptions, ZodOpenApiObject } from 'zod-openapi'
-import { Context } from '@/core/context'
+import type {
+  CreateDocumentOptions,
+  ZodOpenApiObject,
+  ZodOpenApiRequestBodyObject,
+} from 'zod-openapi'
+import { Context } from '@/context'
 import {
   type Provider,
   type ProviderContext,
   resolveProvider,
   runWithRequestScope,
-} from '@/core/di'
-import { registerOpenApiRoute } from '@/core/openapi'
-import { JSONResponse } from '@/core/response'
-import { RequestValidationError, ResponseValidationError } from '@/errors'
-import type { HttpMethod } from '@/types/common'
-import type { ErrorHandler, ValidationErrors } from '@/types/error'
+} from '@/di'
+import type { ErrorHandler, ValidationErrors } from '@/error'
+import { RequestValidationError, ResponseValidationError } from '@/error'
 import type {
   InferAllResponses,
   InferBody,
@@ -30,13 +31,19 @@ import type {
   InferHeaders,
   InferParams,
   InferQuery,
-} from '@/types/infer'
+} from '@/inference'
 import type {
-  BetterApiResponse,
-  ResponsesDefinition,
+  BodySchema,
+  ResponsesSchema,
+  RouteResponse,
   ZodOpenApiResponsesObject,
-} from '@/types/response'
-import { normalizeZodOpenApiResponses } from '@/utils/response'
+} from '@/openapi'
+import {
+  normalizeBodySchema,
+  normalizeResponsesSchema,
+  registerOpenApiRoute,
+} from '@/openapi'
+import { JSONResponse } from '@/response'
 import { isZodType, mergeZodObjects } from '@/utils/zod'
 
 export type HandlerResponse<Responses> =
@@ -93,7 +100,7 @@ export interface BetterAPIOptions<
     headers?: GlobalHeaders
     cookies?: GlobalCookies
   }
-  globalResponses?: Partial<Record<StatusCode, BetterApiResponse>>
+  globalResponses?: Partial<Record<StatusCode, RouteResponse>>
 }
 
 export let globalOpenApiOptions: BetterAPIOptions<
@@ -260,12 +267,12 @@ export class BetterAPI<
   }
 
   private registerRoute<
-    Responses extends ResponsesDefinition,
+    Responses extends ResponsesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends ZodType | undefined = undefined,
+    Body extends BodySchema | undefined = undefined,
     Form extends ZodObject | undefined = undefined,
     File extends ZodFile | undefined = undefined,
     Files extends ZodArray<ZodFile> | undefined = undefined,
@@ -273,7 +280,7 @@ export class BetterAPI<
       | Record<string, Provider<unknown>>
       | undefined = undefined,
   >(
-    method: HttpMethod,
+    method: string,
     path: string,
     handler: (
       context: Context<
@@ -302,7 +309,9 @@ export class BetterAPI<
       Dependencies
     >,
   ) {
-    const responses = normalizeZodOpenApiResponses(options?.responses ?? {})
+    const responses =
+      options?.responses && normalizeResponsesSchema(options?.responses)
+    const body = options?.body && normalizeBodySchema(options.body)
 
     const globalRequestParams = globalOpenApiOptions.globalRequestParams
 
@@ -334,7 +343,7 @@ export class BetterAPI<
       query: mergedQuery,
       headers: mergedHeaders,
       cookies: mergedCookies,
-      body: options?.body,
+      body,
       form: options?.form,
       file: options?.file,
       files: options?.files,
@@ -423,49 +432,27 @@ export class BetterAPI<
 
         let typedBody: unknown | undefined
 
-        if (options?.body) {
-          let schema: ZodType | undefined
-          let isRequired = true
-
-          // 处理两种body写法
-          if (isZodType(options.body)) {
-            schema = options.body
-          } else if (
-            typeof options.body === 'object' &&
-            'schema' in options.body
-          ) {
-            schema = options.body.schema
-            isRequired = options.body.required !== false
+        async function parseBody(validationSchema: ZodType) {
+          const rawBody = await c.req.json()
+          const { success, data, error } =
+            await validationSchema.safeParseAsync(rawBody, {
+              reportInput: true,
+            })
+          if (success) {
+            typedBody = data
+          } else {
+            validationErrors.body = error
           }
+        }
 
-          if (schema) {
-            if (isRequired) {
-              // 必填body
-              const rawBody = await c.req.json()
-              const { success, data, error } = await schema.safeParseAsync(
-                rawBody,
-                { reportInput: true },
-              )
-              if (success) {
-                typedBody = data
-              } else {
-                validationErrors.body = error
-              }
-            } else {
-              // 可选body - 尝试解析，如果解析失败则设为undefined
-              try {
-                const rawBody = await c.req.json()
-                const { success, data } = await schema.safeParseAsync(rawBody, {
-                  reportInput: true,
-                })
-                if (success) {
-                  typedBody = data
-                }
-              } catch {
-                // 如果请求体为空或解析失败，typedBody保持undefined
-                typedBody = undefined
-              }
-            }
+        if (body) {
+          const validationSchema = getRequestBodyValidationSchema(body)
+          const bodyLength = Number(
+            c.req.header('content-length') ??
+              (await c.req.arrayBuffer()).byteLength,
+          )
+          if (validationSchema && (bodyLength > 0 || body.required)) {
+            await parseBody(validationSchema)
           }
         }
 
@@ -569,7 +556,7 @@ export class BetterAPI<
                 ? (result.status as StatusCode)
                 : 200
 
-            const validationSchema = getValidationSchema(
+            const validationSchema = getResponsesValidationSchema(
               responses,
               String(statusCode) as `${1 | 2 | 3 | 4 | 5}${string}`,
             )
@@ -621,12 +608,12 @@ export class BetterAPI<
   }
 
   post<
-    Responses extends ResponsesDefinition,
+    Responses extends ResponsesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends ZodType | undefined = undefined,
+    Body extends BodySchema | undefined = undefined,
     Form extends ZodObject | undefined = undefined,
     File extends ZodFile | undefined = undefined,
     Files extends ZodArray<ZodFile> | undefined = undefined,
@@ -666,12 +653,12 @@ export class BetterAPI<
   }
 
   get<
-    Responses extends ResponsesDefinition,
+    Responses extends ResponsesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends ZodType | undefined = undefined,
+    Body extends BodySchema | undefined = undefined,
     Form extends ZodObject | undefined = undefined,
     File extends ZodFile | undefined = undefined,
     Files extends ZodArray<ZodFile> | undefined = undefined,
@@ -711,7 +698,7 @@ export class BetterAPI<
   }
 
   put<
-    Responses extends ResponsesDefinition,
+    Responses extends ResponsesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
@@ -756,12 +743,12 @@ export class BetterAPI<
   }
 
   delete<
-    Responses extends ResponsesDefinition,
+    Responses extends ResponsesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends ZodType | undefined = undefined,
+    Body extends BodySchema | undefined = undefined,
     Form extends ZodObject | undefined = undefined,
     File extends ZodFile | undefined = undefined,
     Files extends ZodArray<ZodFile> | undefined = undefined,
@@ -801,12 +788,12 @@ export class BetterAPI<
   }
 
   patch<
-    Responses extends ResponsesDefinition,
+    Responses extends ResponsesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends ZodType | undefined = undefined,
+    Body extends BodySchema | undefined = undefined,
     Form extends ZodObject | undefined = undefined,
     File extends ZodFile | undefined = undefined,
     Files extends ZodArray<ZodFile> | undefined = undefined,
@@ -846,7 +833,7 @@ export class BetterAPI<
   }
 
   options<
-    Responses extends ResponsesDefinition,
+    Responses extends ResponsesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
@@ -891,12 +878,12 @@ export class BetterAPI<
   }
 
   head<
-    Responses extends ResponsesDefinition,
+    Responses extends ResponsesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends ZodType | undefined = undefined,
+    Body extends BodySchema | undefined = undefined,
     Form extends ZodObject | undefined = undefined,
     File extends ZodFile | undefined = undefined,
     Files extends ZodArray<ZodFile> | undefined = undefined,
@@ -936,12 +923,12 @@ export class BetterAPI<
   }
 
   trace<
-    Responses extends ResponsesDefinition,
+    Responses extends ResponsesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends ZodType | undefined = undefined,
+    Body extends BodySchema | undefined = undefined,
     Form extends ZodObject | undefined = undefined,
     File extends ZodFile | undefined = undefined,
     Files extends ZodArray<ZodFile> | undefined = undefined,
@@ -981,10 +968,17 @@ export class BetterAPI<
   }
 }
 
-function getValidationSchema(
+function getResponsesValidationSchema(
   responses: ZodOpenApiResponsesObject,
   statusCode: `${1 | 2 | 3 | 4 | 5}${string}`,
 ) {
   const schema = responses[statusCode]?.content?.['application/json']?.schema
+  return isZodType(schema) ? schema : null
+}
+
+function getRequestBodyValidationSchema(
+  requestBody: ZodOpenApiRequestBodyObject,
+) {
+  const schema = requestBody?.content?.['application/json']?.schema
   return isZodType(schema) ? schema : null
 }

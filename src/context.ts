@@ -1,7 +1,6 @@
 import type { Context as HonoContext } from 'hono'
-import type { Provided } from '@/core/api'
-import type { Provider } from '@/core/di'
-import { HTMLResponse, JSONResponse, TextResponse } from '@/core/response'
+import type { Provided } from '@/BetterAPI'
+import type { Provider } from '@/di'
 import type {
   InferBody,
   InferCookies,
@@ -13,8 +12,9 @@ import type {
   InferQuery,
   InferResponse,
   InferStatus,
-} from '@/types/infer'
-import type { StatusOrInit } from './response'
+} from '@/inference'
+import type { StatusOrInit } from '@/response'
+import { HTMLResponse, JSONResponse, TextResponse } from '@/response'
 
 export class Context<
   Responses,
