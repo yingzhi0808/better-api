@@ -8,7 +8,7 @@ import type {
   SimpleZodOpenApiResponseObject,
   ZodOpenApiResponseObject,
 } from '@/openapi'
-import type { BodySchema } from './openapi'
+import type { BodySchema, FileSchema, FilesSchema, FormSchema } from './openapi'
 
 export type InferParams<T> = T extends ZodObject
   ? z.infer<T>
@@ -33,14 +33,99 @@ export type InferBody<T> = T extends BodySchema
           ? z.infer<S> | undefined
           : z.infer<S>
         : never
-      : never
+      : T extends {
+            content: {
+              'application/json': { schema: infer S }
+            }
+            required?: boolean
+          }
+        ? S extends ZodType
+          ? T['required'] extends false
+            ? z.infer<S> | undefined
+            : z.infer<S>
+          : never
+        : never
   : never
 
-export type InferForm<T> = T extends ZodObject ? z.infer<T> : never
+export type InferForm<T> = T extends FormSchema
+  ? T extends ZodType
+    ? z.infer<T>
+    : T extends { schema: infer S; required?: boolean }
+      ? S extends ZodType
+        ? T['required'] extends false
+          ? z.infer<S> | undefined
+          : z.infer<S>
+        : never
+      : T extends {
+            content: {
+              'application/x-www-form-urlencoded': { schema: infer S }
+            }
+            required?: boolean
+          }
+        ? S extends ZodType
+          ? T['required'] extends false
+            ? z.infer<S> | undefined
+            : z.infer<S>
+          : never
+        : T extends {
+              content: {
+                'multipart/form-data': { schema: infer S }
+              }
+              required?: boolean
+            }
+          ? S extends ZodType
+            ? T['required'] extends false
+              ? z.infer<S> | undefined
+              : z.infer<S>
+            : never
+          : never
+  : never
 
-export type InferFile<T> = T extends ZodFile ? z.infer<T> : never
+export type InferFile<T> = T extends FileSchema
+  ? T extends ZodFile
+    ? z.infer<T>
+    : T extends { schema: infer S; required?: boolean }
+      ? S extends ZodFile
+        ? T['required'] extends false
+          ? z.infer<S> | undefined
+          : z.infer<S>
+        : never
+      : T extends {
+            content: {
+              'multipart/form-data': { schema: infer S }
+            }
+            required?: boolean
+          }
+        ? S extends ZodFile
+          ? T['required'] extends false
+            ? z.infer<S> | undefined
+            : z.infer<S>
+          : never
+        : never
+  : never
 
-export type InferFiles<T> = T extends ZodArray<ZodFile> ? z.infer<T> : never
+export type InferFiles<T> = T extends FilesSchema
+  ? T extends ZodArray<ZodFile>
+    ? z.infer<T>
+    : T extends { schema: infer S; required?: boolean }
+      ? S extends ZodArray<ZodFile>
+        ? T['required'] extends false
+          ? z.infer<S> | undefined
+          : z.infer<S>
+        : never
+      : T extends {
+            content: {
+              'multipart/form-data': { schema: infer S }
+            }
+            required?: boolean
+          }
+        ? S extends ZodArray<ZodFile>
+          ? T['required'] extends false
+            ? z.infer<S> | undefined
+            : z.infer<S>
+          : never
+        : never
+  : never
 
 export type InferResponse<Response, Status> = Response extends RouteResponses
   ? Status extends keyof Response
