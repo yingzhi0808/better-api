@@ -274,14 +274,14 @@ export class BetterAPI<
 
   private registerRoute<
     Responses extends ResponsesSchema,
+    Body extends BodySchema,
+    Form extends FormSchema,
+    File extends FileSchema,
+    Files extends FilesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends BodySchema | undefined = undefined,
-    Form extends FormSchema | undefined = undefined,
-    File extends FileSchema | undefined = undefined,
-    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -644,14 +644,14 @@ export class BetterAPI<
 
   post<
     Responses extends ResponsesSchema,
+    Body extends BodySchema,
+    Form extends FormSchema,
+    File extends FileSchema,
+    Files extends FilesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends BodySchema | undefined = undefined,
-    Form extends FormSchema | undefined = undefined,
-    File extends FileSchema | undefined = undefined,
-    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -689,14 +689,14 @@ export class BetterAPI<
 
   get<
     Responses extends ResponsesSchema,
+    Body extends BodySchema,
+    Form extends FormSchema,
+    File extends FileSchema,
+    Files extends FilesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends BodySchema | undefined = undefined,
-    Form extends FormSchema | undefined = undefined,
-    File extends FileSchema | undefined = undefined,
-    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -734,14 +734,14 @@ export class BetterAPI<
 
   put<
     Responses extends ResponsesSchema,
+    Body extends BodySchema,
+    Form extends FormSchema,
+    File extends FileSchema,
+    Files extends FilesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends BodySchema | undefined = undefined,
-    Form extends FormSchema | undefined = undefined,
-    File extends FileSchema | undefined = undefined,
-    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -779,14 +779,14 @@ export class BetterAPI<
 
   delete<
     Responses extends ResponsesSchema,
+    Body extends BodySchema,
+    Form extends FormSchema,
+    File extends FileSchema,
+    Files extends FilesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends BodySchema | undefined = undefined,
-    Form extends FormSchema | undefined = undefined,
-    File extends FileSchema | undefined = undefined,
-    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -824,14 +824,14 @@ export class BetterAPI<
 
   patch<
     Responses extends ResponsesSchema,
+    Body extends BodySchema,
+    Form extends FormSchema,
+    File extends FileSchema,
+    Files extends FilesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends BodySchema | undefined = undefined,
-    Form extends FormSchema | undefined = undefined,
-    File extends FileSchema | undefined = undefined,
-    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -869,14 +869,14 @@ export class BetterAPI<
 
   options<
     Responses extends ResponsesSchema,
+    Body extends BodySchema,
+    Form extends FormSchema,
+    File extends FileSchema,
+    Files extends FilesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends BodySchema | undefined = undefined,
-    Form extends FormSchema | undefined = undefined,
-    File extends FileSchema | undefined = undefined,
-    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -914,14 +914,14 @@ export class BetterAPI<
 
   head<
     Responses extends ResponsesSchema,
+    Body extends BodySchema,
+    Form extends FormSchema,
+    File extends FileSchema,
+    Files extends FilesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends BodySchema | undefined = undefined,
-    Form extends FormSchema | undefined = undefined,
-    File extends FileSchema | undefined = undefined,
-    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
@@ -959,14 +959,14 @@ export class BetterAPI<
 
   trace<
     Responses extends ResponsesSchema,
+    Body extends BodySchema,
+    Form extends FormSchema,
+    File extends FileSchema,
+    Files extends FilesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
-    Body extends BodySchema | undefined = undefined,
-    Form extends FormSchema | undefined = undefined,
-    File extends FileSchema | undefined = undefined,
-    Files extends FilesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
