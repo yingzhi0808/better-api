@@ -302,7 +302,7 @@ export class BetterAPI<
         Dependencies
       >,
     ) => HandlerResponse<Responses>,
-    options?: RouteConfig<
+    config?: RouteConfig<
       Responses,
       Params,
       Query,
@@ -316,32 +316,32 @@ export class BetterAPI<
     >,
   ) {
     const responses =
-      options?.responses && normalizeResponsesSchema(options?.responses)
-    const body = options?.body && normalizeBodySchema(options.body)
-    const form = options?.form && normalizeFormSchema(options.form)
-    const file = options?.file && normalizeFileSchema(options.file)
-    const files = options?.files && normalizeFilesSchema(options.files)
+      config?.responses && normalizeResponsesSchema(config?.responses)
+    const body = config?.body && normalizeBodySchema(config.body)
+    const form = config?.form && normalizeFormSchema(config.form)
+    const file = config?.file && normalizeFileSchema(config.file)
+    const files = config?.files && normalizeFilesSchema(config.files)
 
     const globalRequestParams = globalOpenApiOptions.globalRequestParams
 
     const mergedParams = mergeZodObjects(
       globalRequestParams?.params,
-      options?.params,
+      config?.params,
     )
 
     const mergedQuery = mergeZodObjects(
       globalRequestParams?.query,
-      options?.query,
+      config?.query,
     )
 
     const mergedHeaders = mergeZodObjects(
       globalRequestParams?.headers,
-      options?.headers,
+      config?.headers,
     )
 
     const mergedCookies = mergeZodObjects(
       globalRequestParams?.cookies,
-      options?.cookies,
+      config?.cookies,
     )
 
     registerOpenApiRoute({
@@ -356,11 +356,11 @@ export class BetterAPI<
       form,
       file,
       files,
-      summary: options?.summary,
-      description: options?.description,
-      tags: options?.tags,
-      operationId: options?.operationId,
-      deprecated: options?.deprecated,
+      summary: config?.summary,
+      description: config?.description,
+      tags: config?.tags,
+      operationId: config?.operationId,
+      deprecated: config?.deprecated,
     })
 
     const wrapper: Handler = (c) => {
@@ -547,7 +547,7 @@ export class BetterAPI<
         // dependencies
         let depsObject: Provided<Dependencies> =
           undefined as Provided<Dependencies>
-        if (options?.dependencies) {
+        if (config?.dependencies) {
           const makeCtx = (hono: HonoContext): ProviderContext => {
             const ctx: ProviderContext = {
               hono,
@@ -557,7 +557,7 @@ export class BetterAPI<
           }
           const providerCtx = makeCtx(c)
           const entries = Object.entries(
-            options.dependencies as Record<string, Provider<unknown>>,
+            config.dependencies as Record<string, Provider<unknown>>,
           ).map(([k, p]) => [k, resolveProvider(p, providerCtx)] as const)
           depsObject = Object.fromEntries(entries) as Provided<Dependencies>
         }
@@ -671,7 +671,7 @@ export class BetterAPI<
         Dependencies
       >,
     ) => HandlerResponse<Responses>,
-    options?: RouteConfig<
+    config?: RouteConfig<
       Responses,
       Params,
       Query,
@@ -684,7 +684,7 @@ export class BetterAPI<
       Dependencies
     >,
   ) {
-    this.registerRoute('post', path, handler, options)
+    this.registerRoute('post', path, handler, config)
   }
 
   get<
@@ -716,7 +716,7 @@ export class BetterAPI<
         Dependencies
       >,
     ) => HandlerResponse<Responses>,
-    options?: RouteConfig<
+    config?: RouteConfig<
       Responses,
       Params,
       Query,
@@ -729,7 +729,7 @@ export class BetterAPI<
       Dependencies
     >,
   ) {
-    this.registerRoute('get', path, handler, options)
+    this.registerRoute('get', path, handler, config)
   }
 
   put<
@@ -761,7 +761,7 @@ export class BetterAPI<
         Dependencies
       >,
     ) => HandlerResponse<Responses>,
-    options?: RouteConfig<
+    config?: RouteConfig<
       Responses,
       Params,
       Query,
@@ -774,7 +774,7 @@ export class BetterAPI<
       Dependencies
     >,
   ) {
-    this.registerRoute('put', path, handler, options)
+    this.registerRoute('put', path, handler, config)
   }
 
   delete<
@@ -806,7 +806,7 @@ export class BetterAPI<
         Dependencies
       >,
     ) => HandlerResponse<Responses>,
-    options?: RouteConfig<
+    config?: RouteConfig<
       Responses,
       Params,
       Query,
@@ -819,7 +819,7 @@ export class BetterAPI<
       Dependencies
     >,
   ) {
-    this.registerRoute('delete', path, handler, options)
+    this.registerRoute('delete', path, handler, config)
   }
 
   patch<
@@ -851,7 +851,7 @@ export class BetterAPI<
         Dependencies
       >,
     ) => HandlerResponse<Responses>,
-    options?: RouteConfig<
+    config?: RouteConfig<
       Responses,
       Params,
       Query,
@@ -864,7 +864,7 @@ export class BetterAPI<
       Dependencies
     >,
   ) {
-    this.registerRoute('patch', path, handler, options)
+    this.registerRoute('patch', path, handler, config)
   }
 
   options<
@@ -896,7 +896,7 @@ export class BetterAPI<
         Dependencies
       >,
     ) => HandlerResponse<Responses>,
-    options?: RouteConfig<
+    config?: RouteConfig<
       Responses,
       Params,
       Query,
@@ -909,7 +909,7 @@ export class BetterAPI<
       Dependencies
     >,
   ) {
-    this.registerRoute('options', path, handler, options)
+    this.registerRoute('options', path, handler, config)
   }
 
   head<
@@ -941,7 +941,7 @@ export class BetterAPI<
         Dependencies
       >,
     ) => HandlerResponse<Responses>,
-    options?: RouteConfig<
+    config?: RouteConfig<
       Responses,
       Params,
       Query,
@@ -954,7 +954,7 @@ export class BetterAPI<
       Dependencies
     >,
   ) {
-    this.registerRoute('head', path, handler, options)
+    this.registerRoute('head', path, handler, config)
   }
 
   trace<
@@ -986,7 +986,7 @@ export class BetterAPI<
         Dependencies
       >,
     ) => HandlerResponse<Responses>,
-    options?: RouteConfig<
+    config?: RouteConfig<
       Responses,
       Params,
       Query,
@@ -999,7 +999,7 @@ export class BetterAPI<
       Dependencies
     >,
   ) {
-    this.registerRoute('trace', path, handler, options)
+    this.registerRoute('trace', path, handler, config)
   }
 }
 
