@@ -545,32 +545,7 @@ export class BetterAPI<
       })
     }
 
-    switch (method) {
-      case 'get':
-        this.instance.get(path, wrapper)
-        break
-      case 'post':
-        this.instance.post(path, wrapper)
-        break
-      case 'put':
-        this.instance.put(path, wrapper)
-        break
-      case 'delete':
-        this.instance.delete(path, wrapper)
-        break
-      case 'patch':
-        this.instance.patch(path, wrapper)
-        break
-      case 'options':
-        this.instance.options(path, wrapper)
-        break
-      case 'head':
-        this.instance.on('HEAD', path, wrapper)
-        break
-      case 'trace':
-        this.instance.on('TRACE', path, wrapper)
-        break
-    }
+    this.instance.on(method.toUpperCase(), path, wrapper)
   }
 
   private createHttpMethod(
@@ -586,12 +561,10 @@ export class BetterAPI<
     }
   }
 
-  post = this.createHttpMethod('post')
   get = this.createHttpMethod('get')
+  post = this.createHttpMethod('post')
   put = this.createHttpMethod('put')
   delete = this.createHttpMethod('delete')
   patch = this.createHttpMethod('patch')
   options = this.createHttpMethod('options')
-  head = this.createHttpMethod('head')
-  trace = this.createHttpMethod('trace')
 }
