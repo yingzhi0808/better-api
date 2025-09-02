@@ -53,6 +53,14 @@ export type HandlerResponse<Responses> =
   | InferAllResponses<Responses>
   | Promise<InferAllResponses<Responses> | Response>
 
+type MergeZodObjects<Global, Local> = Global extends ZodObject
+  ? Local extends ZodObject
+    ? Local & Global
+    : Global
+  : Local extends ZodObject
+    ? Local
+    : Record<string, string>
+
 export type Provided<
   Dependencies extends Record<string, Provider<unknown>> | undefined,
 > = Dependencies extends Record<string, Provider<unknown>>
@@ -92,10 +100,10 @@ export interface RouteConfig<
  * 通用HTTP方法签名接口
  */
 export type HttpMethodSignature<
-  GlobalParams extends ZodObject,
-  GlobalQuery extends ZodObject,
-  GlobalHeaders extends ZodObject,
-  GlobalCookies extends ZodObject,
+  GlobalParams extends ZodObject | undefined,
+  GlobalQuery extends ZodObject | undefined,
+  GlobalHeaders extends ZodObject | undefined,
+  GlobalCookies extends ZodObject | undefined,
 > = <
   Params extends ZodObject | undefined = undefined,
   Query extends ZodObject | undefined = undefined,
@@ -113,10 +121,10 @@ export type HttpMethodSignature<
   path: string,
   handler: (
     context: Context<
-      InferParams<Params & GlobalParams>,
-      InferQuery<Query & GlobalQuery>,
-      InferHeaders<Headers & GlobalHeaders>,
-      InferCookies<Cookies & GlobalCookies>,
+      InferParams<MergeZodObjects<GlobalParams, Params>>,
+      InferQuery<MergeZodObjects<GlobalQuery, Query>>,
+      InferHeaders<MergeZodObjects<GlobalHeaders, Headers>>,
+      InferCookies<MergeZodObjects<GlobalCookies, Cookies>>,
       InferBody<Body>,
       InferForm<Form>,
       InferFile<File>,
@@ -126,10 +134,10 @@ export type HttpMethodSignature<
     >,
   ) => HandlerResponse<Responses>,
   config?: RouteConfig<
-    Params & ZodObject,
-    Query & ZodObject,
-    Headers & Headers,
-    Cookies & Cookies,
+    Params,
+    Query,
+    Headers,
+    Cookies,
     Body & BodySchema,
     Form & FormSchema,
     File & FileSchema,
@@ -140,10 +148,10 @@ export type HttpMethodSignature<
 ) => void
 
 export interface BetterAPIOptions<
-  GlobalParams extends ZodObject,
-  GlobalQuery extends ZodObject,
-  GlobalHeaders extends ZodObject,
-  GlobalCookies extends ZodObject,
+  GlobalParams extends ZodObject | undefined = undefined,
+  GlobalQuery extends ZodObject | undefined = undefined,
+  GlobalHeaders extends ZodObject | undefined = undefined,
+  GlobalCookies extends ZodObject | undefined = undefined,
 > {
   openapi?: Partial<Omit<ZodOpenApiObject, 'paths'>>
   createDocumentOptions?: CreateDocumentOptions
@@ -157,17 +165,17 @@ export interface BetterAPIOptions<
 }
 
 export let globalOpenApiOptions: BetterAPIOptions<
-  ZodObject,
-  ZodObject,
-  ZodObject,
-  ZodObject
+  ZodObject | undefined,
+  ZodObject | undefined,
+  ZodObject | undefined,
+  ZodObject | undefined
 > = {}
 
 export class BetterAPI<
-  GlobalParams extends ZodObject,
-  GlobalQuery extends ZodObject,
-  GlobalHeaders extends ZodObject,
-  GlobalCookies extends ZodObject,
+  GlobalParams extends ZodObject | undefined = undefined,
+  GlobalQuery extends ZodObject | undefined = undefined,
+  GlobalHeaders extends ZodObject | undefined = undefined,
+  GlobalCookies extends ZodObject | undefined = undefined,
 > {
   private instance = new Hono()
   private errorHandlers = new Map()
@@ -337,10 +345,10 @@ export class BetterAPI<
     method: string,
     handler: (
       context: Context<
-        InferParams<Params & GlobalParams>,
-        InferQuery<Query & GlobalQuery>,
-        InferHeaders<Headers & GlobalHeaders>,
-        InferCookies<Cookies & GlobalCookies>,
+        InferParams<MergeZodObjects<GlobalParams, Params>>,
+        InferQuery<MergeZodObjects<GlobalQuery, Query>>,
+        InferHeaders<MergeZodObjects<GlobalHeaders, Headers>>,
+        InferCookies<MergeZodObjects<GlobalCookies, Cookies>>,
         InferBody<Body>,
         InferForm<Form>,
         InferFile<File>,
@@ -350,10 +358,10 @@ export class BetterAPI<
       >,
     ) => HandlerResponse<Responses>,
     config?: RouteConfig<
-      Params & ZodObject,
-      Query & ZodObject,
-      Headers & Headers,
-      Cookies & Cookies,
+      Params,
+      Query,
+      Headers,
+      Cookies,
       Body & BodySchema,
       Form & FormSchema,
       File & FileSchema,
@@ -592,10 +600,14 @@ export class BetterAPI<
 
         const context = new Context(
           c,
-          parsedParams as InferParams<Params & GlobalParams>,
-          parsedQuery as InferQuery<Query & GlobalQuery>,
-          parsedHeaders as InferHeaders<Headers & GlobalHeaders>,
-          parsedCookies as InferCookies<Cookies & GlobalCookies>,
+          parsedParams as InferParams<MergeZodObjects<GlobalParams, Params>>,
+          parsedQuery as InferQuery<MergeZodObjects<GlobalQuery, Query>>,
+          parsedHeaders as InferHeaders<
+            MergeZodObjects<GlobalHeaders, Headers>
+          >,
+          parsedCookies as InferCookies<
+            MergeZodObjects<GlobalCookies, Cookies>
+          >,
           parsedBody as InferBody<Body>,
           parsedForm as InferForm<Form>,
           parsedFile as InferFile<File>,
