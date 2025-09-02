@@ -91,6 +91,7 @@ function createZodOpenApiPathItemObject(route: OpenApiRouteConfig): ZodOpenApiPa
   }
 
   const operation: ZodOpenApiOperationObject = {
+    // @ts-expect-error
     requestParams,
     requestBody,
     responses,
