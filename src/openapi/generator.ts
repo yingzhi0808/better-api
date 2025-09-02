@@ -1,5 +1,5 @@
 import http from 'node:http'
-import { globalOpenApiOptions } from '@/BetterAPI'
+import { globalOpenApiOptions } from '@/core/BetterAPI'
 import 'zod-openapi'
 import type { StatusCode } from 'hono/utils/http-status'
 import {
