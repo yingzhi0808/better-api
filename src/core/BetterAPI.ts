@@ -582,7 +582,7 @@ export class BetterAPI<
     GlobalCookies
   > {
     return (path, handler, config) => {
-      this.registerRoute(method, path, handler, config)
+      this.registerRoute(path, method, handler, config)
     }
   }
 
