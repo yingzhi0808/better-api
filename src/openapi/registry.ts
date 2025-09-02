@@ -1,7 +1,7 @@
 import type { OpenApiRouteConfig } from './types'
 
-export const openAPIRoutes: OpenApiRouteConfig[] = []
+export const openApiRoutes: OpenApiRouteConfig[] = []
 
 export function registerOpenApiRoute(route: OpenApiRouteConfig) {
-  openAPIRoutes.push(route)
+  openApiRoutes.push(route)
 }

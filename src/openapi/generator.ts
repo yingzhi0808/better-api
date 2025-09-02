@@ -13,13 +13,13 @@ import {
   type ZodOpenApiRequestBodyObject,
 } from 'zod-openapi'
 import { normalizeResponsesSchema } from './normalizer'
-import { openAPIRoutes } from './registry'
+import { openApiRoutes } from './registry'
 import type { OpenApiRouteConfig, ZodOpenApiResponsesObject } from './types'
 
 export function generateDocument(): ReturnType<typeof createDocument> {
   const paths: ZodOpenApiPathsObject = {}
 
-  for (const route of openAPIRoutes) {
+  for (const route of openApiRoutes) {
     const path = convertExpressPathToOpenAPI(route.path)
 
     if (!paths[path]) {
