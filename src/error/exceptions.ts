@@ -24,9 +24,7 @@ export class HTTPException extends HonoHTTPException {
       cause: options?.cause,
       message:
         options?.message ??
-        (typeof body.message === 'string'
-          ? body.message
-          : http.STATUS_CODES[status]!),
+        (typeof body.message === 'string' ? body.message : http.STATUS_CODES[status]!),
     })
 
     this.name = this.constructor.name

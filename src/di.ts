@@ -15,11 +15,7 @@ export interface SecurityMeta {
   scopes?: string[]
 }
 
-export function requiresAuth<T>(
-  scheme: string,
-  provider: Provider<T>,
-  scopes?: string[],
-) {
+export function requiresAuth<T>(scheme: string, provider: Provider<T>, scopes?: string[]) {
   const wrapped: Provider<T> = async (ctx: ProviderContext) => {
     const user = await ctx.get(provider as Provider<unknown>)
     if (!user) {
@@ -27,9 +23,7 @@ export function requiresAuth<T>(
     }
     if (scopes && scopes.length > 0) {
       const u = user as { scopes?: unknown }
-      const userScopes: string[] = Array.isArray(u.scopes)
-        ? (u.scopes as string[])
-        : []
+      const userScopes: string[] = Array.isArray(u.scopes) ? (u.scopes as string[]) : []
       const missing = scopes.filter((s) => !userScopes.includes(s))
       if (missing.length > 0) {
         throw new Error('forbidden')
@@ -37,9 +31,7 @@ export function requiresAuth<T>(
     }
     return user as T
   }
-  ;(wrapped as unknown as Record<typeof kSecurityMeta, SecurityMeta>)[
-    kSecurityMeta
-  ] = {
+  ;(wrapped as unknown as Record<typeof kSecurityMeta, SecurityMeta>)[kSecurityMeta] = {
     scheme,
     scopes,
   }
@@ -56,10 +48,7 @@ export function runWithRequestScope<T>(fn: () => Promise<T> | T) {
   return storage.run(new Map(), fn)
 }
 
-export async function resolveProvider<T>(
-  provider: Provider<T>,
-  ctx: ProviderContext,
-) {
+export async function resolveProvider<T>(provider: Provider<T>, ctx: ProviderContext) {
   const store = storage.getStore()
   if (store) {
     const cached = store.get(provider)

@@ -65,13 +65,12 @@ export type MergeZodObjects<Global, Local> = Global extends ZodObject
     ? Local
     : Record<string, string>
 
-export type Provided<
-  Dependencies extends Record<string, Provider<unknown>> | undefined,
-> = Dependencies extends Record<string, Provider<unknown>>
-  ? {
-      [K in keyof Dependencies]: Promise<Awaited<ReturnType<Dependencies[K]>>>
-    }
-  : undefined
+export type Provided<Dependencies extends Record<string, Provider<unknown>> | undefined> =
+  Dependencies extends Record<string, Provider<unknown>>
+    ? {
+        [K in keyof Dependencies]: Promise<Awaited<ReturnType<Dependencies[K]>>>
+      }
+    : undefined
 
 export type HttpMethodSignature<
   GlobalParams extends ZodObject | undefined,
@@ -88,9 +87,7 @@ export type HttpMethodSignature<
   File extends FileSchema | undefined = undefined,
   Files extends FilesSchema | undefined = undefined,
   Responses extends ResponsesSchema | undefined = undefined,
-  Dependencies extends
-    | Record<string, Provider<unknown>>
-    | undefined = undefined,
+  Dependencies extends Record<string, Provider<unknown>> | undefined = undefined,
 >(
   path: string,
   handler: (

@@ -8,9 +8,6 @@ export interface HTTPExceptionOptions {
   headers?: Record<ResponseHeader | CustomHeader, string>
 }
 
-export type ErrorHandler<T extends Error> = (
-  err: T,
-  c: Context,
-) => Response | Promise<Response>
+export type ErrorHandler<T extends Error> = (err: T, c: Context) => Response | Promise<Response>
 
 export type ValidationErrors = Record<string, ZodError>

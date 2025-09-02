@@ -40,17 +40,12 @@ export function generateDocument(): ReturnType<typeof createDocument> {
     ...globalOpenApiOptions.openapi,
   }
 
-  const document = createDocument(
-    mergedConfig,
-    globalOpenApiOptions.createDocumentOptions,
-  )
+  const document = createDocument(mergedConfig, globalOpenApiOptions.createDocumentOptions)
 
   return document
 }
 
-function createZodOpenApiPathItemObject(
-  route: OpenApiRouteConfig,
-): ZodOpenApiPathItemObject {
+function createZodOpenApiPathItemObject(route: OpenApiRouteConfig): ZodOpenApiPathItemObject {
   const requestParams: ZodOpenApiParameters = {}
   if (route.params) {
     requestParams.path = route.params
@@ -87,9 +82,7 @@ function createZodOpenApiPathItemObject(
   }
 
   if (normalizedGlobalResponses) {
-    for (const [statusCode, response] of Object.entries(
-      normalizedGlobalResponses,
-    )) {
+    for (const [statusCode, response] of Object.entries(normalizedGlobalResponses)) {
       responses[Number(statusCode) as StatusCode] = {
         description: response.description || http.STATUS_CODES[statusCode],
         content: response.content,

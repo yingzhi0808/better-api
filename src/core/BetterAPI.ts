@@ -7,12 +7,7 @@ import type { StatusCode } from 'hono/utils/http-status'
 import type { ZodObject } from 'zod'
 import { z } from 'zod'
 import { Context } from '@/context'
-import {
-  type Provider,
-  type ProviderContext,
-  resolveProvider,
-  runWithRequestScope,
-} from '@/di'
+import { type Provider, type ProviderContext, resolveProvider, runWithRequestScope } from '@/di'
 import type { ErrorHandler, ValidationErrors } from '@/error'
 import { RequestValidationError, ResponseValidationError } from '@/error'
 import type {
@@ -25,13 +20,7 @@ import type {
   InferParams,
   InferQuery,
 } from '@/inference'
-import type {
-  BodySchema,
-  FileSchema,
-  FilesSchema,
-  FormSchema,
-  ResponsesSchema,
-} from '@/openapi'
+import type { BodySchema, FileSchema, FilesSchema, FormSchema, ResponsesSchema } from '@/openapi'
 import {
   normalizeBodySchema,
   normalizeFileSchema,
@@ -68,14 +57,7 @@ export class BetterAPI<
   private instance = new Hono()
   private errorHandlers = new Map()
 
-  constructor(
-    options?: BetterAPIOptions<
-      GlobalParams,
-      GlobalQuery,
-      GlobalHeaders,
-      GlobalCookies
-    >,
-  ) {
+  constructor(options?: BetterAPIOptions<GlobalParams, GlobalQuery, GlobalHeaders, GlobalCookies>) {
     if (options) {
       globalOpenApiOptions = options
       this.setDefaultGlobalResponses(options)
@@ -180,12 +162,7 @@ export class BetterAPI<
    * 设置默认全局响应
    */
   private setDefaultGlobalResponses(
-    options: BetterAPIOptions<
-      GlobalParams,
-      GlobalQuery,
-      GlobalHeaders,
-      GlobalCookies
-    >,
+    options: BetterAPIOptions<GlobalParams, GlobalQuery, GlobalHeaders, GlobalCookies>,
   ) {
     if (!options.globalResponses) {
       options.globalResponses = {}
@@ -225,9 +202,7 @@ export class BetterAPI<
     File extends FileSchema | undefined = undefined,
     Files extends FilesSchema | undefined = undefined,
     Responses extends ResponsesSchema | undefined = undefined,
-    Dependencies extends
-      | Record<string, Provider<unknown>>
-      | undefined = undefined,
+    Dependencies extends Record<string, Provider<unknown>> | undefined = undefined,
   >(
     path: string,
     method: string,
@@ -262,20 +237,13 @@ export class BetterAPI<
     const form = config?.form && normalizeFormSchema(config.form)
     const file = config?.file && normalizeFileSchema(config.file)
     const files = config?.files && normalizeFilesSchema(config.files)
-    const responses =
-      config?.responses && normalizeResponsesSchema(config?.responses)
+    const responses = config?.responses && normalizeResponsesSchema(config?.responses)
 
     const globalRequestParams = globalOpenApiOptions.globalRequestParams
     const params = mergeZodObjects(globalRequestParams?.params, config?.params)
     const query = mergeZodObjects(globalRequestParams?.query, config?.query)
-    const headers = mergeZodObjects(
-      globalRequestParams?.headers,
-      config?.headers,
-    )
-    const cookies = mergeZodObjects(
-      globalRequestParams?.cookies,
-      config?.cookies,
-    )
+    const headers = mergeZodObjects(globalRequestParams?.headers, config?.headers)
+    const cookies = mergeZodObjects(globalRequestParams?.cookies, config?.cookies)
 
     registerOpenApiRoute({
       path,
@@ -303,10 +271,9 @@ export class BetterAPI<
         const rawParams = c.req.param()
         let parsedParams: InferParams<ZodObject> | typeof rawParams = rawParams
         if (params) {
-          const { success, data, error } = await params.safeParseAsync(
-            rawParams,
-            { reportInput: true },
-          )
+          const { success, data, error } = await params.safeParseAsync(rawParams, {
+            reportInput: true,
+          })
           if (success) {
             parsedParams = data
           } else {
@@ -323,10 +290,9 @@ export class BetterAPI<
         )
         let parsedQuery: InferQuery<ZodObject> | typeof rawQueries = rawQuery
         if (query) {
-          const { success, data, error } = await query.safeParseAsync(
-            rawQuery,
-            { reportInput: true },
-          )
+          const { success, data, error } = await query.safeParseAsync(rawQuery, {
+            reportInput: true,
+          })
           if (success) {
             parsedQuery = data
           } else {
@@ -334,17 +300,12 @@ export class BetterAPI<
           }
         }
 
-        const rawHeaders = c.req.header() as Record<
-          Lowercase<RequestHeader>,
-          string
-        >
-        let parsedHeaders: InferHeaders<ZodObject> | typeof rawHeaders =
-          rawHeaders
+        const rawHeaders = c.req.header() as Record<Lowercase<RequestHeader>, string>
+        let parsedHeaders: InferHeaders<ZodObject> | typeof rawHeaders = rawHeaders
         if (headers) {
-          const { success, data, error } = await headers.safeParseAsync(
-            rawHeaders,
-            { reportInput: true },
-          )
+          const { success, data, error } = await headers.safeParseAsync(rawHeaders, {
+            reportInput: true,
+          })
           if (success) {
             parsedHeaders = { ...rawHeaders, ...data }
           } else {
@@ -353,13 +314,11 @@ export class BetterAPI<
         }
 
         const rawCookies = getCookie(c)
-        let parsedCookies: InferCookies<ZodObject> | typeof rawCookies =
-          rawCookies
+        let parsedCookies: InferCookies<ZodObject> | typeof rawCookies = rawCookies
         if (cookies) {
-          const { success, data, error } = await cookies.safeParseAsync(
-            rawCookies,
-            { reportInput: true },
-          )
+          const { success, data, error } = await cookies.safeParseAsync(rawCookies, {
+            reportInput: true,
+          })
           if (success) {
             parsedCookies = data
           } else {
@@ -412,8 +371,7 @@ export class BetterAPI<
         }
 
         // dependencies
-        let depsObject: Provided<Dependencies> =
-          undefined as Provided<Dependencies>
+        let depsObject: Provided<Dependencies> = undefined as Provided<Dependencies>
         if (config?.dependencies) {
           const makeCtx = (hono: HonoContext): ProviderContext => {
             const ctx: ProviderContext = {
@@ -433,12 +391,8 @@ export class BetterAPI<
           c,
           parsedParams as InferParams<MergeZodObjects<GlobalParams, Params>>,
           parsedQuery as InferQuery<MergeZodObjects<GlobalQuery, Query>>,
-          parsedHeaders as InferHeaders<
-            MergeZodObjects<GlobalHeaders, Headers>
-          >,
-          parsedCookies as InferCookies<
-            MergeZodObjects<GlobalCookies, Cookies>
-          >,
+          parsedHeaders as InferHeaders<MergeZodObjects<GlobalHeaders, Headers>>,
+          parsedCookies as InferCookies<MergeZodObjects<GlobalCookies, Cookies>>,
           parsedBody as InferBody<Body>,
           parsedForm as InferForm<Form>,
           parsedFile as InferFile<File>,
@@ -449,29 +403,19 @@ export class BetterAPI<
         const result = await handler(context)
 
         if (responses) {
-          const shouldValidate =
-            result instanceof JSONResponse || !(result instanceof Response)
+          const shouldValidate = result instanceof JSONResponse || !(result instanceof Response)
 
           if (shouldValidate) {
             const responseData =
-              result instanceof JSONResponse
-                ? await result.clone().json()
-                : result
-            const statusCode =
-              result instanceof JSONResponse
-                ? (result.status as StatusCode)
-                : 200
+              result instanceof JSONResponse ? await result.clone().json() : result
+            const statusCode = result instanceof JSONResponse ? (result.status as StatusCode) : 200
 
-            const validationSchema = getResponsesValidationSchema(
-              responses,
-              statusCode,
-            )
+            const validationSchema = getResponsesValidationSchema(responses, statusCode)
 
             if (validationSchema) {
-              const { success, data, error } =
-                await validationSchema.safeParseAsync(responseData, {
-                  reportInput: true,
-                })
+              const { success, data, error } = await validationSchema.safeParseAsync(responseData, {
+                reportInput: true,
+              })
               if (success) {
                 return new JSONResponse(data, statusCode)
               }
@@ -489,12 +433,7 @@ export class BetterAPI<
 
   private createHttpMethod(
     method: string,
-  ): HttpMethodSignature<
-    GlobalParams,
-    GlobalQuery,
-    GlobalHeaders,
-    GlobalCookies
-  > {
+  ): HttpMethodSignature<GlobalParams, GlobalQuery, GlobalHeaders, GlobalCookies> {
     return (path, handler, config) => {
       this.registerRoute(path, method, handler, config)
     }

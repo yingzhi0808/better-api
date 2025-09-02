@@ -20,9 +20,7 @@ export function isSimpleZodOpenApiResponseObject(
   return obj !== null && typeof obj === 'object' && 'schema' in obj
 }
 
-export function isZodOpenApiResponseObject(
-  obj: unknown,
-): obj is ZodOpenApiResponseObject {
+export function isZodOpenApiResponseObject(obj: unknown): obj is ZodOpenApiResponseObject {
   return obj !== null && typeof obj === 'object' && 'content' in obj
 }
 
@@ -33,9 +31,7 @@ export function isRouteResponses(obj: unknown): obj is RouteResponses {
 
   return Object.values(obj).some(
     (val) =>
-      isZodType(val) ||
-      isSimpleZodOpenApiResponseObject(val) ||
-      isZodOpenApiResponseObject(val),
+      isZodType(val) || isSimpleZodOpenApiResponseObject(val) || isZodOpenApiResponseObject(val),
   )
 }
 
@@ -118,9 +114,7 @@ export function isSimpleZodOpenApiRequestBodyObject(
   return obj !== null && typeof obj === 'object' && 'schema' in obj
 }
 
-export function isZodOpenApiRequestBodyObject(
-  obj: unknown,
-): obj is ZodOpenApiRequestBodyObject {
+export function isZodOpenApiRequestBodyObject(obj: unknown): obj is ZodOpenApiRequestBodyObject {
   return obj !== null && typeof obj === 'object' && 'content' in obj
 }
 

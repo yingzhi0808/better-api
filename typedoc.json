@@ -1,11 +1,6 @@
 {
   "name": "better-api",
-  "entryPoints": [
-    "src/index.ts",
-    "src/express/index.ts",
-    "src/koa/index.ts",
-    "src/hono/index.ts"
-  ],
+  "entryPoints": ["src/index.ts", "src/express/index.ts", "src/koa/index.ts", "src/hono/index.ts"],
   "out": "docs/api",
   "docsRoot": "docs",
   "plugin": ["typedoc-plugin-markdown", "typedoc-vitepress-theme"],
@@ -20,14 +15,5 @@
   },
   "indexFormat": "table",
   "expandParameters": true,
-  "categoryOrder": [
-    "Core",
-    "Builders",
-    "Parsers",
-    "Analyzers",
-    "Types",
-    "Express",
-    "Koa",
-    "Hono"
-  ]
+  "categoryOrder": ["Core", "Builders", "Parsers", "Analyzers", "Types", "Express", "Koa", "Hono"]
 }

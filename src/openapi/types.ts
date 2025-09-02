@@ -21,23 +21,20 @@ export interface ZodOpenApiRequestBodyObject<T extends ZodType = ZodType>
   content: ZodOpenApiContentObject<T>
 }
 
-export type SimpleZodOpenApiRequestBodyObject<T extends ZodType = ZodType> =
-  Omit<ZodOpenApiRequestBodyObject<T>, 'content'> & ZodOpenApiMediaTypeObject<T>
+export type SimpleZodOpenApiRequestBodyObject<T extends ZodType = ZodType> = Omit<
+  ZodOpenApiRequestBodyObject<T>,
+  'content'
+> &
+  ZodOpenApiMediaTypeObject<T>
 
-export interface ZodOpenApiResponseObject
-  extends Omit<_ZodOpenApiResponseObject, 'description'> {
+export interface ZodOpenApiResponseObject extends Omit<_ZodOpenApiResponseObject, 'description'> {
   description?: string
 }
 
-export type SimpleZodOpenApiResponseObject = Omit<
-  ZodOpenApiResponseObject,
-  'content'
-> &
+export type SimpleZodOpenApiResponseObject = Omit<ZodOpenApiResponseObject, 'content'> &
   ZodOpenApiMediaTypeObject
 
-export type ZodOpenApiResponsesObject = Partial<
-  Record<StatusCode, ZodOpenApiResponseObject>
->
+export type ZodOpenApiResponsesObject = Partial<Record<StatusCode, ZodOpenApiResponseObject>>
 
 export interface OpenApiRouteConfig {
   path: string
@@ -85,10 +82,7 @@ export type FilesSchema =
   | SimpleZodOpenApiRequestBodyObject<ZodArray<ZodFile>>
   | ZodOpenApiRequestBodyObject<ZodArray<ZodFile>>
 
-export type RouteResponse =
-  | ZodType
-  | SimpleZodOpenApiResponseObject
-  | ZodOpenApiResponseObject
+export type RouteResponse = ZodType | SimpleZodOpenApiResponseObject | ZodOpenApiResponseObject
 
 export type RouteResponses = Partial<Record<StatusCode, RouteResponse>>
 

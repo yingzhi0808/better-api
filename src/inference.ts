@@ -10,13 +10,9 @@ import type {
 } from '@/openapi'
 import type { BodySchema, FileSchema, FilesSchema, FormSchema } from './openapi'
 
-export type InferParams<T> = T extends ZodObject
-  ? z.infer<T>
-  : Record<string, string>
+export type InferParams<T> = T extends ZodObject ? z.infer<T> : Record<string, string>
 
-export type InferQuery<T> = T extends ZodObject
-  ? z.infer<T>
-  : Record<string, string | string[]>
+export type InferQuery<T> = T extends ZodObject ? z.infer<T> : Record<string, string | string[]>
 
 export type InferHeaders<T> = T extends ZodObject
   ? z.infer<T> & Record<Lowercase<RequestHeader>, string>

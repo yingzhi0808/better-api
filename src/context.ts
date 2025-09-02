@@ -28,18 +28,17 @@ export class Context<
     public readonly dependencies: Dependencies,
   ) {}
 
-  json<
-    Data extends InferResponse<Responses, Status>,
-    const Status extends 200 = 200,
-  >(data: Data): JSONResponse<Data, Status>
-  json<
-    Data extends InferResponse<Responses, Status>,
-    const Status extends InferStatus<Responses>,
-  >(data: Data, statusOrInit: StatusOrInit<Status>): JSONResponse<Data, Status>
-  json<
-    Data extends InferResponse<Responses, Status>,
-    const Status extends InferStatus<Responses>,
-  >(data: Data, statusOrInit?: StatusOrInit<Status>) {
+  json<Data extends InferResponse<Responses, Status>, const Status extends 200 = 200>(
+    data: Data,
+  ): JSONResponse<Data, Status>
+  json<Data extends InferResponse<Responses, Status>, const Status extends InferStatus<Responses>>(
+    data: Data,
+    statusOrInit: StatusOrInit<Status>,
+  ): JSONResponse<Data, Status>
+  json<Data extends InferResponse<Responses, Status>, const Status extends InferStatus<Responses>>(
+    data: Data,
+    statusOrInit?: StatusOrInit<Status>,
+  ) {
     return new JSONResponse(data, statusOrInit)
   }
 

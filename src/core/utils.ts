@@ -1,10 +1,7 @@
 import type { Context as HonoContext } from 'hono'
 import type { StatusCode } from 'hono/utils/http-status'
 import type { ZodType } from 'zod'
-import type {
-  ZodOpenApiRequestBodyObject,
-  ZodOpenApiResponsesObject,
-} from '@/openapi'
+import type { ZodOpenApiRequestBodyObject, ZodOpenApiResponsesObject } from '@/openapi'
 import { isZodType } from '@/utils/zod'
 
 export function getResponsesValidationSchema(
@@ -43,13 +40,9 @@ export async function parseRequestBody<T extends ZodType>(
       : contentType === 'form'
         ? ['multipart/form-data', 'application/x-www-form-urlencoded']
         : ['multipart/form-data']
-  const validationSchema = getRequestBodyValidationSchema(
-    requestBody,
-    mediaTypes,
-  )
+  const validationSchema = getRequestBodyValidationSchema(requestBody, mediaTypes)
   const bodyLength = Number(
-    context.req.header('content-length') ??
-      (await context.req.arrayBuffer()).byteLength,
+    context.req.header('content-length') ?? (await context.req.arrayBuffer()).byteLength,
   )
   if (validationSchema && (bodyLength > 0 || requestBody.required)) {
     let rawBody: unknown
@@ -70,9 +63,7 @@ export async function parseRequestBody<T extends ZodType>(
       case 'files':
         {
           const rawForm = await context.req.parseBody({ all: true })
-          rawBody = Array.isArray(rawForm.files)
-            ? rawForm.files
-            : [rawForm.files]
+          rawBody = Array.isArray(rawForm.files) ? rawForm.files : [rawForm.files]
         }
         break
     }

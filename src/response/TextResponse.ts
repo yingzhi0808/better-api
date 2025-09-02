@@ -6,8 +6,7 @@ export class TextResponse<
   const Status extends StatusCode = 200,
 > extends Response {
   constructor(body: Body, statusOrInit?: StatusOrInit<Status>) {
-    const init =
-      typeof statusOrInit === 'object' ? statusOrInit : { status: statusOrInit }
+    const init = typeof statusOrInit === 'object' ? statusOrInit : { status: statusOrInit }
     const { headers, ...rest } = init
 
     super(body, {
