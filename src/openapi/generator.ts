@@ -1,6 +1,7 @@
 import http from 'node:http'
 import { globalOpenApiOptions } from '@/BetterAPI'
 import 'zod-openapi'
+import type { StatusCode } from 'hono/utils/http-status'
 import {
   type ZodOpenApiResponsesObject as _ZodOpenApiResponsesObject,
   createDocument,
@@ -13,7 +14,7 @@ import {
 } from 'zod-openapi'
 import { normalizeResponsesSchema } from './normalizer'
 import { openAPIRoutes } from './registry'
-import type { OpenApiRouteConfig } from './types'
+import type { OpenApiRouteConfig, ZodOpenApiResponsesObject } from './types'
 
 export function generateDocument(): ReturnType<typeof createDocument> {
   const paths: ZodOpenApiPathsObject = {}
@@ -74,7 +75,7 @@ function createZodOpenApiPathItemObject(
     requestBody = route.files
   }
 
-  const responses: _ZodOpenApiResponsesObject = {}
+  const responses: ZodOpenApiResponsesObject = {}
   let normalizedGlobalResponses =
     globalOpenApiOptions.globalResponses &&
     normalizeResponsesSchema(globalOpenApiOptions.globalResponses)
@@ -89,7 +90,7 @@ function createZodOpenApiPathItemObject(
     for (const [statusCode, response] of Object.entries(
       normalizedGlobalResponses,
     )) {
-      responses[statusCode as `${1 | 2 | 3 | 4 | 5}${string}`] = {
+      responses[Number(statusCode) as StatusCode] = {
         description: response.description || http.STATUS_CODES[statusCode],
         content: response.content,
       }

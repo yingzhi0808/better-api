@@ -1,3 +1,4 @@
+import type { StatusCode } from 'hono/utils/http-status'
 import type { ZodOpenApiRequestBodyObject } from 'zod-openapi'
 import { isZodType } from '@/utils/zod'
 import type {
@@ -77,7 +78,7 @@ export function normalizeResponsesSchema(responses: ResponsesSchema) {
   if (isRouteResponses(responses)) {
     const result: ZodOpenApiResponsesObject = {}
     for (const [statusCode, config] of Object.entries(responses)) {
-      const status = statusCode as `${1 | 2 | 3 | 4 | 5}${string}`
+      const status = Number(statusCode) as StatusCode
 
       if (isZodType(config)) {
         result[status] = {

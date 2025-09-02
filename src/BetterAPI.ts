@@ -2,16 +2,11 @@ import http from 'node:http'
 import { type Handler, Hono, type Context as HonoContext } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { HTTPException } from 'hono/http-exception'
-import type { Cookie } from 'hono/utils/cookie'
 import type { RequestHeader } from 'hono/utils/headers'
 import type { StatusCode } from 'hono/utils/http-status'
-import type { ZodObject } from 'zod'
+import type { ZodObject, ZodType } from 'zod'
 import { z } from 'zod'
-import type {
-  CreateDocumentOptions,
-  ZodOpenApiObject,
-  ZodOpenApiRequestBodyObject,
-} from 'zod-openapi'
+import type { CreateDocumentOptions, ZodOpenApiObject } from 'zod-openapi'
 import { Context } from '@/context'
 import {
   type Provider,
@@ -39,6 +34,7 @@ import type {
   FormSchema,
   ResponsesSchema,
   RouteResponse,
+  ZodOpenApiRequestBodyObject,
   ZodOpenApiResponsesObject,
 } from '@/openapi'
 import {
@@ -64,7 +60,6 @@ export type Provided<
   : undefined
 
 export interface RouteConfig<
-  Responses,
   Params,
   Query,
   Headers,
@@ -73,9 +68,9 @@ export interface RouteConfig<
   Form,
   File,
   Files,
+  Responses,
   Dependencies,
 > {
-  responses?: Responses
   params?: Params
   query?: Query
   headers?: Headers
@@ -84,13 +79,65 @@ export interface RouteConfig<
   form?: Form
   file?: File
   files?: Files
-  dependencies?: Dependencies
+  responses?: Responses
   summary?: string
   description?: string
   tags?: string[]
   operationId?: string
   deprecated?: boolean
+  dependencies?: Dependencies
 }
+
+/**
+ * 通用HTTP方法签名接口
+ */
+export type HttpMethodSignature<
+  GlobalParams extends ZodObject,
+  GlobalQuery extends ZodObject,
+  GlobalHeaders extends ZodObject,
+  GlobalCookies extends ZodObject,
+> = <
+  Params extends ZodObject | undefined = undefined,
+  Query extends ZodObject | undefined = undefined,
+  Headers extends ZodObject | undefined = undefined,
+  Cookies extends ZodObject | undefined = undefined,
+  Body extends BodySchema | undefined = undefined,
+  Form extends FormSchema | undefined = undefined,
+  File extends FileSchema | undefined = undefined,
+  Files extends FilesSchema | undefined = undefined,
+  Responses extends ResponsesSchema | undefined = undefined,
+  Dependencies extends
+    | Record<string, Provider<unknown>>
+    | undefined = undefined,
+>(
+  path: string,
+  handler: (
+    context: Context<
+      InferParams<Params & GlobalParams>,
+      InferQuery<Query & GlobalQuery>,
+      InferHeaders<Headers & GlobalHeaders>,
+      InferCookies<Cookies & GlobalCookies>,
+      InferBody<Body>,
+      InferForm<Form>,
+      InferFile<File>,
+      InferFiles<Files>,
+      Responses,
+      Provided<Dependencies>
+    >,
+  ) => HandlerResponse<Responses>,
+  config?: RouteConfig<
+    Params & ZodObject,
+    Query & ZodObject,
+    Headers & Headers,
+    Cookies & Cookies,
+    Body & BodySchema,
+    Form & FormSchema,
+    File & FileSchema,
+    Files & FilesSchema,
+    Responses & ResponsesSchema,
+    Dependencies
+  >,
+) => void
 
 export interface BetterAPIOptions<
   GlobalParams extends ZodObject,
@@ -273,73 +320,63 @@ export class BetterAPI<
   }
 
   private registerRoute<
-    Responses extends ResponsesSchema,
-    Body extends BodySchema,
-    Form extends FormSchema,
-    File extends FileSchema,
-    Files extends FilesSchema,
     Params extends ZodObject | undefined = undefined,
     Query extends ZodObject | undefined = undefined,
     Headers extends ZodObject | undefined = undefined,
     Cookies extends ZodObject | undefined = undefined,
+    Body extends BodySchema | undefined = undefined,
+    Form extends FormSchema | undefined = undefined,
+    File extends FileSchema | undefined = undefined,
+    Files extends FilesSchema | undefined = undefined,
+    Responses extends ResponsesSchema | undefined = undefined,
     Dependencies extends
       | Record<string, Provider<unknown>>
       | undefined = undefined,
   >(
-    method: string,
     path: string,
+    method: string,
     handler: (
       context: Context<
+        InferParams<Params & GlobalParams>,
+        InferQuery<Query & GlobalQuery>,
+        InferHeaders<Headers & GlobalHeaders>,
+        InferCookies<Cookies & GlobalCookies>,
+        InferBody<Body>,
+        InferForm<Form>,
+        InferFile<File>,
+        InferFiles<Files>,
         Responses,
-        Params & GlobalParams,
-        Query & GlobalQuery,
-        Headers & GlobalHeaders,
-        Cookies & GlobalCookies,
-        Body,
-        Form,
-        File,
-        Files,
-        Dependencies
+        Provided<Dependencies>
       >,
     ) => HandlerResponse<Responses>,
     config?: RouteConfig<
-      Responses,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
+      Params & ZodObject,
+      Query & ZodObject,
+      Headers & Headers,
+      Cookies & Cookies,
+      Body & BodySchema,
+      Form & FormSchema,
+      File & FileSchema,
+      Files & FilesSchema,
+      Responses & ResponsesSchema,
       Dependencies
     >,
   ) {
-    const responses =
-      config?.responses && normalizeResponsesSchema(config?.responses)
     const body = config?.body && normalizeBodySchema(config.body)
     const form = config?.form && normalizeFormSchema(config.form)
     const file = config?.file && normalizeFileSchema(config.file)
     const files = config?.files && normalizeFilesSchema(config.files)
+    const responses =
+      config?.responses && normalizeResponsesSchema(config?.responses)
 
     const globalRequestParams = globalOpenApiOptions.globalRequestParams
-
-    const mergedParams = mergeZodObjects(
-      globalRequestParams?.params,
-      config?.params,
-    )
-
-    const mergedQuery = mergeZodObjects(
-      globalRequestParams?.query,
-      config?.query,
-    )
-
-    const mergedHeaders = mergeZodObjects(
+    const params = mergeZodObjects(globalRequestParams?.params, config?.params)
+    const query = mergeZodObjects(globalRequestParams?.query, config?.query)
+    const headers = mergeZodObjects(
       globalRequestParams?.headers,
       config?.headers,
     )
-
-    const mergedCookies = mergeZodObjects(
+    const cookies = mergeZodObjects(
       globalRequestParams?.cookies,
       config?.cookies,
     )
@@ -348,10 +385,10 @@ export class BetterAPI<
       path,
       method,
       responses,
-      params: mergedParams,
-      query: mergedQuery,
-      headers: mergedHeaders,
-      cookies: mergedCookies,
+      params,
+      query,
+      headers,
+      cookies,
       body,
       form,
       file,
@@ -368,16 +405,14 @@ export class BetterAPI<
         const validationErrors: ValidationErrors = {}
 
         const rawParams = c.req.param()
-        let typedParams: Record<string, string> | Record<string, unknown> =
-          rawParams
-
-        if (mergedParams) {
-          const { success, data, error } = await mergedParams.safeParseAsync(
+        let parsedParams: InferParams<ZodObject> | typeof rawParams = rawParams
+        if (params) {
+          const { success, data, error } = await params.safeParseAsync(
             rawParams,
             { reportInput: true },
           )
           if (success) {
-            typedParams = data
+            parsedParams = data
           } else {
             validationErrors.params = error
           }
@@ -390,57 +425,53 @@ export class BetterAPI<
             Array.isArray(values) && values.length === 1 ? values[0] : values,
           ]),
         )
-        let typedQuery:
-          | Record<string, string | string[]>
-          | Record<string, unknown> = rawQuery
-
-        if (mergedQuery) {
-          const { success, data, error } = await mergedQuery.safeParseAsync(
+        let parsedQuery: InferQuery<ZodObject> | typeof rawQueries = rawQuery
+        if (query) {
+          const { success, data, error } = await query.safeParseAsync(
             rawQuery,
             { reportInput: true },
           )
-
           if (success) {
-            typedQuery = data
+            parsedQuery = data
           } else {
             validationErrors.query = error
           }
         }
 
-        const rawHeaders = c.req.header()
-        let typedHeaders:
-          | Record<RequestHeader, string>
-          | Record<string, unknown> = rawHeaders
-
-        if (mergedHeaders) {
-          const { success, data, error } = await mergedHeaders.safeParseAsync(
+        const rawHeaders = c.req.header() as Record<
+          Lowercase<RequestHeader>,
+          string
+        >
+        let parsedHeaders: InferHeaders<ZodObject> | typeof rawHeaders =
+          rawHeaders
+        if (headers) {
+          const { success, data, error } = await headers.safeParseAsync(
             rawHeaders,
             { reportInput: true },
           )
           if (success) {
-            typedHeaders = data
+            parsedHeaders = { ...rawHeaders, ...data }
           } else {
             validationErrors.headers = error
           }
         }
 
         const rawCookies = getCookie(c)
-        let typedCookies: Cookie | Record<string, unknown> = rawCookies
-
-        if (mergedCookies) {
-          const { success, data, error } = await mergedCookies.safeParseAsync(
+        let parsedCookies: InferCookies<ZodObject> | typeof rawCookies =
+          rawCookies
+        if (cookies) {
+          const { success, data, error } = await cookies.safeParseAsync(
             rawCookies,
             { reportInput: true },
           )
           if (success) {
-            typedCookies = data
+            parsedCookies = data
           } else {
             validationErrors.cookies = error
           }
         }
 
-        let typedBody: unknown | undefined
-
+        let parsedBody: InferBody<BodySchema> | undefined
         if (body) {
           const validationSchema = getRequestBodyValidationSchema(body, [
             'application/json',
@@ -456,15 +487,14 @@ export class BetterAPI<
                 reportInput: true,
               })
             if (success) {
-              typedBody = data
+              parsedBody = data
             } else {
               validationErrors.body = error
             }
           }
         }
 
-        let typedForm: unknown | undefined
-
+        let parsedForm: InferForm<FormSchema> | undefined
         if (form) {
           const validationSchema = getRequestBodyValidationSchema(form, [
             'multipart/form-data',
@@ -481,15 +511,14 @@ export class BetterAPI<
                 reportInput: true,
               })
             if (success) {
-              typedForm = data
+              parsedForm = data
             } else {
               validationErrors.form = error
             }
           }
         }
 
-        let typedFile: unknown | undefined
-
+        let parsedFile: InferFile<FileSchema> | undefined
         if (file) {
           const validationSchema = getRequestBodyValidationSchema(file, [
             'multipart/form-data',
@@ -506,15 +535,14 @@ export class BetterAPI<
                 reportInput: true,
               })
             if (success) {
-              typedFile = data
+              parsedFile = data
             } else {
               validationErrors.file = error
             }
           }
         }
 
-        let typedFiles: unknown | undefined
-
+        let parsedFiles: InferFiles<FilesSchema> | undefined
         if (files) {
           const validationSchema = getRequestBodyValidationSchema(files, [
             'multipart/form-data',
@@ -533,7 +561,7 @@ export class BetterAPI<
                 reportInput: true,
               })
             if (success) {
-              typedFiles = data
+              parsedFiles = data
             } else {
               validationErrors.files = error
             }
@@ -564,14 +592,14 @@ export class BetterAPI<
 
         const context = new Context(
           c,
-          typedParams as InferParams<Params>,
-          typedQuery as InferQuery<Query>,
-          typedHeaders as InferHeaders<Headers>,
-          typedCookies as InferCookies<Cookies>,
-          typedBody as InferBody<Body>,
-          typedForm as InferForm<Form>,
-          typedFile as InferFile<File>,
-          typedFiles as InferFiles<Files>,
+          parsedParams as InferParams<Params & GlobalParams>,
+          parsedQuery as InferQuery<Query & GlobalQuery>,
+          parsedHeaders as InferHeaders<Headers & GlobalHeaders>,
+          parsedCookies as InferCookies<Cookies & GlobalCookies>,
+          parsedBody as InferBody<Body>,
+          parsedForm as InferForm<Form>,
+          parsedFile as InferFile<File>,
+          parsedFiles as InferFiles<Files>,
           depsObject,
         )
 
@@ -593,7 +621,7 @@ export class BetterAPI<
 
             const validationSchema = getResponsesValidationSchema(
               responses,
-              String(statusCode) as `${1 | 2 | 3 | 4 | 5}${string}`,
+              statusCode,
             )
 
             if (validationSchema) {
@@ -642,377 +670,39 @@ export class BetterAPI<
     }
   }
 
-  post<
-    Responses extends ResponsesSchema,
-    Body extends BodySchema,
-    Form extends FormSchema,
-    File extends FileSchema,
-    Files extends FilesSchema,
-    Params extends ZodObject | undefined = undefined,
-    Query extends ZodObject | undefined = undefined,
-    Headers extends ZodObject | undefined = undefined,
-    Cookies extends ZodObject | undefined = undefined,
-    Dependencies extends
-      | Record<string, Provider<unknown>>
-      | undefined = undefined,
-  >(
-    path: string,
-    handler: (
-      context: Context<
-        Responses,
-        Params & GlobalParams,
-        Query & GlobalQuery,
-        Headers & GlobalHeaders,
-        Cookies & GlobalCookies,
-        Body,
-        Form,
-        File,
-        Files,
-        Dependencies
-      >,
-    ) => HandlerResponse<Responses>,
-    config?: RouteConfig<
-      Responses,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >,
-  ) {
-    this.registerRoute('post', path, handler, config)
+  private createHttpMethod(
+    method: string,
+  ): HttpMethodSignature<
+    GlobalParams,
+    GlobalQuery,
+    GlobalHeaders,
+    GlobalCookies
+  > {
+    return (path, handler, config) => {
+      this.registerRoute(method, path, handler, config)
+    }
   }
 
-  get<
-    Responses extends ResponsesSchema,
-    Body extends BodySchema,
-    Form extends FormSchema,
-    File extends FileSchema,
-    Files extends FilesSchema,
-    Params extends ZodObject | undefined = undefined,
-    Query extends ZodObject | undefined = undefined,
-    Headers extends ZodObject | undefined = undefined,
-    Cookies extends ZodObject | undefined = undefined,
-    Dependencies extends
-      | Record<string, Provider<unknown>>
-      | undefined = undefined,
-  >(
-    path: string,
-    handler: (
-      context: Context<
-        Responses,
-        Params & GlobalParams,
-        Query & GlobalQuery,
-        Headers & GlobalHeaders,
-        Cookies & GlobalCookies,
-        Body,
-        Form,
-        File,
-        Files,
-        Dependencies
-      >,
-    ) => HandlerResponse<Responses>,
-    config?: RouteConfig<
-      Responses,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >,
-  ) {
-    this.registerRoute('get', path, handler, config)
-  }
-
-  put<
-    Responses extends ResponsesSchema,
-    Body extends BodySchema,
-    Form extends FormSchema,
-    File extends FileSchema,
-    Files extends FilesSchema,
-    Params extends ZodObject | undefined = undefined,
-    Query extends ZodObject | undefined = undefined,
-    Headers extends ZodObject | undefined = undefined,
-    Cookies extends ZodObject | undefined = undefined,
-    Dependencies extends
-      | Record<string, Provider<unknown>>
-      | undefined = undefined,
-  >(
-    path: string,
-    handler: (
-      context: Context<
-        Responses,
-        Params & GlobalParams,
-        Query & GlobalQuery,
-        Headers & GlobalHeaders,
-        Cookies & GlobalCookies,
-        Body,
-        Form,
-        File,
-        Files,
-        Dependencies
-      >,
-    ) => HandlerResponse<Responses>,
-    config?: RouteConfig<
-      Responses,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >,
-  ) {
-    this.registerRoute('put', path, handler, config)
-  }
-
-  delete<
-    Responses extends ResponsesSchema,
-    Body extends BodySchema,
-    Form extends FormSchema,
-    File extends FileSchema,
-    Files extends FilesSchema,
-    Params extends ZodObject | undefined = undefined,
-    Query extends ZodObject | undefined = undefined,
-    Headers extends ZodObject | undefined = undefined,
-    Cookies extends ZodObject | undefined = undefined,
-    Dependencies extends
-      | Record<string, Provider<unknown>>
-      | undefined = undefined,
-  >(
-    path: string,
-    handler: (
-      context: Context<
-        Responses,
-        Params & GlobalParams,
-        Query & GlobalQuery,
-        Headers & GlobalHeaders,
-        Cookies & GlobalCookies,
-        Body,
-        Form,
-        File,
-        Files,
-        Dependencies
-      >,
-    ) => HandlerResponse<Responses>,
-    config?: RouteConfig<
-      Responses,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >,
-  ) {
-    this.registerRoute('delete', path, handler, config)
-  }
-
-  patch<
-    Responses extends ResponsesSchema,
-    Body extends BodySchema,
-    Form extends FormSchema,
-    File extends FileSchema,
-    Files extends FilesSchema,
-    Params extends ZodObject | undefined = undefined,
-    Query extends ZodObject | undefined = undefined,
-    Headers extends ZodObject | undefined = undefined,
-    Cookies extends ZodObject | undefined = undefined,
-    Dependencies extends
-      | Record<string, Provider<unknown>>
-      | undefined = undefined,
-  >(
-    path: string,
-    handler: (
-      context: Context<
-        Responses,
-        Params & GlobalParams,
-        Query & GlobalQuery,
-        Headers & GlobalHeaders,
-        Cookies & GlobalCookies,
-        Body,
-        Form,
-        File,
-        Files,
-        Dependencies
-      >,
-    ) => HandlerResponse<Responses>,
-    config?: RouteConfig<
-      Responses,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >,
-  ) {
-    this.registerRoute('patch', path, handler, config)
-  }
-
-  options<
-    Responses extends ResponsesSchema,
-    Body extends BodySchema,
-    Form extends FormSchema,
-    File extends FileSchema,
-    Files extends FilesSchema,
-    Params extends ZodObject | undefined = undefined,
-    Query extends ZodObject | undefined = undefined,
-    Headers extends ZodObject | undefined = undefined,
-    Cookies extends ZodObject | undefined = undefined,
-    Dependencies extends
-      | Record<string, Provider<unknown>>
-      | undefined = undefined,
-  >(
-    path: string,
-    handler: (
-      context: Context<
-        Responses,
-        Params & GlobalParams,
-        Query & GlobalQuery,
-        Headers & GlobalHeaders,
-        Cookies & GlobalCookies,
-        Body,
-        Form,
-        File,
-        Files,
-        Dependencies
-      >,
-    ) => HandlerResponse<Responses>,
-    config?: RouteConfig<
-      Responses,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >,
-  ) {
-    this.registerRoute('options', path, handler, config)
-  }
-
-  head<
-    Responses extends ResponsesSchema,
-    Body extends BodySchema,
-    Form extends FormSchema,
-    File extends FileSchema,
-    Files extends FilesSchema,
-    Params extends ZodObject | undefined = undefined,
-    Query extends ZodObject | undefined = undefined,
-    Headers extends ZodObject | undefined = undefined,
-    Cookies extends ZodObject | undefined = undefined,
-    Dependencies extends
-      | Record<string, Provider<unknown>>
-      | undefined = undefined,
-  >(
-    path: string,
-    handler: (
-      context: Context<
-        Responses,
-        Params & GlobalParams,
-        Query & GlobalQuery,
-        Headers & GlobalHeaders,
-        Cookies & GlobalCookies,
-        Body,
-        Form,
-        File,
-        Files,
-        Dependencies
-      >,
-    ) => HandlerResponse<Responses>,
-    config?: RouteConfig<
-      Responses,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >,
-  ) {
-    this.registerRoute('head', path, handler, config)
-  }
-
-  trace<
-    Responses extends ResponsesSchema,
-    Body extends BodySchema,
-    Form extends FormSchema,
-    File extends FileSchema,
-    Files extends FilesSchema,
-    Params extends ZodObject | undefined = undefined,
-    Query extends ZodObject | undefined = undefined,
-    Headers extends ZodObject | undefined = undefined,
-    Cookies extends ZodObject | undefined = undefined,
-    Dependencies extends
-      | Record<string, Provider<unknown>>
-      | undefined = undefined,
-  >(
-    path: string,
-    handler: (
-      context: Context<
-        Responses,
-        Params & GlobalParams,
-        Query & GlobalQuery,
-        Headers & GlobalHeaders,
-        Cookies & GlobalCookies,
-        Body,
-        Form,
-        File,
-        Files,
-        Dependencies
-      >,
-    ) => HandlerResponse<Responses>,
-    config?: RouteConfig<
-      Responses,
-      Params,
-      Query,
-      Headers,
-      Cookies,
-      Body,
-      Form,
-      File,
-      Files,
-      Dependencies
-    >,
-  ) {
-    this.registerRoute('trace', path, handler, config)
-  }
+  post = this.createHttpMethod('post')
+  get = this.createHttpMethod('get')
+  put = this.createHttpMethod('put')
+  delete = this.createHttpMethod('delete')
+  patch = this.createHttpMethod('patch')
+  options = this.createHttpMethod('options')
+  head = this.createHttpMethod('head')
+  trace = this.createHttpMethod('trace')
 }
 
 function getResponsesValidationSchema(
   responses: ZodOpenApiResponsesObject,
-  statusCode: `${1 | 2 | 3 | 4 | 5}${string}`,
+  statusCode: StatusCode,
 ) {
   const schema = responses[statusCode]?.content?.['application/json']?.schema
   return isZodType(schema) ? schema : null
 }
 
-function getRequestBodyValidationSchema(
-  requestBody: ZodOpenApiRequestBodyObject,
+function getRequestBodyValidationSchema<T extends ZodType>(
+  requestBody: ZodOpenApiRequestBodyObject<T>,
   mediaTypes: string[],
 ) {
   for (const mediaType of mediaTypes) {

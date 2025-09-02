@@ -1,23 +1,9 @@
 import type { Context as HonoContext } from 'hono'
-import type { Provided } from '@/BetterAPI'
-import type { Provider } from '@/di'
-import type {
-  InferBody,
-  InferCookies,
-  InferFile,
-  InferFiles,
-  InferForm,
-  InferHeaders,
-  InferParams,
-  InferQuery,
-  InferResponse,
-  InferStatus,
-} from '@/inference'
+import type { InferResponse, InferStatus } from '@/inference'
 import type { StatusOrInit } from '@/response'
 import { HTMLResponse, JSONResponse, TextResponse } from '@/response'
 
 export class Context<
-  Responses,
   Params,
   Query,
   Headers,
@@ -26,19 +12,20 @@ export class Context<
   Form,
   File,
   Files,
-  Dependencies extends Record<string, Provider<unknown>> | undefined,
+  Responses,
+  Dependencies,
 > {
   constructor(
     public readonly hono: HonoContext,
-    public readonly params: InferParams<Params>,
-    public readonly query: InferQuery<Query>,
-    public readonly headers: InferHeaders<Headers>,
-    public readonly cookies: InferCookies<Cookies>,
-    public readonly body: InferBody<Body>,
-    public readonly form: InferForm<Form>,
-    public readonly file: InferFile<File>,
-    public readonly files: InferFiles<Files>,
-    public readonly dependencies: Provided<Dependencies>,
+    public readonly params: Params,
+    public readonly query: Query,
+    public readonly headers: Headers,
+    public readonly cookies: Cookies,
+    public readonly body: Body,
+    public readonly form: Form,
+    public readonly file: File,
+    public readonly files: Files,
+    public readonly dependencies: Dependencies,
   ) {}
 
   json<

@@ -48,10 +48,10 @@ export type InferBody<T> = T extends BodySchema
   : never
 
 export type InferForm<T> = T extends FormSchema
-  ? T extends ZodType
+  ? T extends ZodObject
     ? z.infer<T>
     : T extends { schema: infer S; required?: boolean }
-      ? S extends ZodType
+      ? S extends ZodObject
         ? T['required'] extends false
           ? z.infer<S> | undefined
           : z.infer<S>
@@ -62,7 +62,7 @@ export type InferForm<T> = T extends FormSchema
             }
             required?: boolean
           }
-        ? S extends ZodType
+        ? S extends ZodObject
           ? T['required'] extends false
             ? z.infer<S> | undefined
             : z.infer<S>
@@ -73,7 +73,7 @@ export type InferForm<T> = T extends FormSchema
               }
               required?: boolean
             }
-          ? S extends ZodType
+          ? S extends ZodObject
             ? T['required'] extends false
               ? z.infer<S> | undefined
               : z.infer<S>
