@@ -50,10 +50,7 @@ import type {
   Provided,
   RouteConfig,
 } from './types'
-import {
-  getRequestBodyValidationSchema,
-  getResponsesValidationSchema,
-} from './utils'
+import { getResponsesValidationSchema, parseRequestBody } from './utils'
 
 export let globalOpenApiOptions: BetterAPIOptions<
   ZodObject | undefined,
@@ -299,8 +296,8 @@ export class BetterAPI<
       deprecated: config?.deprecated,
     })
 
-    const wrapper: Handler = (c) => {
-      return runWithRequestScope(async () => {
+    const wrapper: Handler = (c) =>
+      runWithRequestScope(async () => {
         const validationErrors: ValidationErrors = {}
 
         const rawParams = c.req.param()
@@ -371,99 +368,42 @@ export class BetterAPI<
         }
 
         let parsedBody: InferBody<BodySchema> | undefined
-        if (body) {
-          const validationSchema = getRequestBodyValidationSchema(body, [
-            'application/json',
-          ])
-          const bodyLength = Number(
-            c.req.header('content-length') ??
-              (await c.req.arrayBuffer()).byteLength,
-          )
-          if (validationSchema && (bodyLength > 0 || body.required)) {
-            const rawBody = await c.req.json()
-            const { success, data, error } =
-              await validationSchema.safeParseAsync(rawBody, {
-                reportInput: true,
-              })
-            if (success) {
-              parsedBody = data
-            } else {
-              validationErrors.body = error
-            }
+        const jsonResult = await parseRequestBody(c, 'json', body)
+        if (jsonResult) {
+          if (jsonResult.success) {
+            parsedBody = jsonResult.data
+          } else {
+            validationErrors.body = jsonResult.error
           }
         }
 
         let parsedForm: InferForm<FormSchema> | undefined
-        if (form) {
-          const validationSchema = getRequestBodyValidationSchema(form, [
-            'multipart/form-data',
-            'application/x-www-form-urlencoded',
-          ])
-          const bodyLength = Number(
-            c.req.header('content-length') ??
-              (await c.req.arrayBuffer()).byteLength,
-          )
-          if (validationSchema && (bodyLength > 0 || form.required)) {
-            const rawForm = await c.req.parseBody({ all: true })
-            const { success, data, error } =
-              await validationSchema.safeParseAsync(rawForm, {
-                reportInput: true,
-              })
-            if (success) {
-              parsedForm = data
-            } else {
-              validationErrors.form = error
-            }
+        const formResult = await parseRequestBody(c, 'form', form)
+        if (formResult) {
+          if (formResult.success) {
+            parsedForm = formResult.data
+          } else {
+            validationErrors.form = formResult.error
           }
         }
 
         let parsedFile: InferFile<FileSchema> | undefined
-        if (file) {
-          const validationSchema = getRequestBodyValidationSchema(file, [
-            'multipart/form-data',
-          ])
-          const bodyLength = Number(
-            c.req.header('content-length') ??
-              (await c.req.arrayBuffer()).byteLength,
-          )
-          if (validationSchema && (bodyLength > 0 || file.required)) {
-            const rawForm = await c.req.parseBody({ all: true })
-            const rawFile = rawForm.file
-            const { success, data, error } =
-              await validationSchema.safeParseAsync(rawFile, {
-                reportInput: true,
-              })
-            if (success) {
-              parsedFile = data
-            } else {
-              validationErrors.file = error
-            }
+        const fileResult = await parseRequestBody(c, 'file', file)
+        if (fileResult) {
+          if (fileResult.success) {
+            parsedFile = fileResult.data
+          } else {
+            validationErrors.file = fileResult.error
           }
         }
 
         let parsedFiles: InferFiles<FilesSchema> | undefined
-        if (files) {
-          const validationSchema = getRequestBodyValidationSchema(files, [
-            'multipart/form-data',
-          ])
-          const bodyLength = Number(
-            c.req.header('content-length') ??
-              (await c.req.arrayBuffer()).byteLength,
-          )
-          if (validationSchema && (bodyLength > 0 || files.required)) {
-            const rawForm = await c.req.parseBody({ all: true })
-            const rawFiles = Array.isArray(rawForm.files)
-              ? rawForm.files
-              : [rawForm.files]
-            const { success, data, error } =
-              await validationSchema.safeParseAsync(rawFiles, {
-                reportInput: true,
-              })
-            if (success) {
-              parsedFiles = data
-            } else {
-              validationErrors.files = error
-            }
+        const filesResult = await parseRequestBody(c, 'files', files)
+        if (filesResult) {
+          if (filesResult.success) {
+            parsedFiles = filesResult.data
+          } else {
+            validationErrors.files = filesResult.error
           }
         }
 
@@ -543,7 +483,6 @@ export class BetterAPI<
 
         return result
       })
-    }
 
     this.instance.on(method.toUpperCase(), path, wrapper)
   }
